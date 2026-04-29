@@ -16,12 +16,27 @@ It features a beautiful, responsive React Single-Page Application (SPA) dashboar
 - **Persistent NVS Storage**: All configuration changes made in the UI are securely saved to the ESP32's Non-Volatile Storage (NVS) and persist across power cycles and firmware updates.
 - **WiFiManager Integration**: No hardcoded network credentials. The ESP32 spins up its own Access Point on first boot so you can easily connect it to your home Wi-Fi network.
 
+## Expected Printer Compatibility
+
+Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/query`), which makes it completely hardware-agnostic. It will work "out of the box" with virtually **any 3D printer running Klipper firmware** with Moonraker installed.
+
+*   **Natively Supported Printers**: Any modern printer that ships with Klipper and exposes the Moonraker API (e.g., Snapmaker U1, Sovol SV07/SV08, Elegoo Neptune 4 Series, Qidi Tech X-Max 3, FLSUN V400).
+*   **The DIY Ecosystem**: Custom builds running MainsailOS or FluiddPI (Voron, RatRig, VZBot, HevORT).
+*   **Retrofitted Printers**: Printers upgraded with a Raspberry Pi, Creality Sonic Pad, or BTT Pad 7.
+*   **Rooted Printers**: Commercial printers that have been rooted to expose native Klipper (like the Creality K1 series).
+
 ## Hardware Requirements
 
 1. **ESP32 Microcontroller** (e.g., ESP32 D1 Mini, NodeMCU-32S)
 2. **WS2812B LED Strip** (NeoPixels)
 3. **5V Power Supply** (Make sure it provides enough amperage for your LED count. A rough rule of thumb is ~60mA per LED at maximum white brightness).
 4. *Optional:* Logic Level Shifter (3.3V to 5V) if your LED strip glitches when connected directly to the ESP32's 3.3V data pin.
+
+> **⚠️ Important Hardware Note**: While an ESP32 can output a 3.3V data signal and provide *some* 5V power from its `VIN` pin when connected to USB, this is only safe for a very small number of LEDs (typically < 30) at low brightness. For larger strips, you **must** use an external 5V power supply to avoid drawing too much current and destroying the microcontroller. 
+> 
+> Additionally, WS2812B LEDs technically expect a 5V data signal. While the ESP32's 3.3V signal often works, it can cause flickering or glitches on longer runs. If you experience this, use a logic level shifter (like the 74AHCT125) to boost the 3.3V signal to 5V.
+>
+> For a comprehensive dive into wiring and powering LEDs correctly, please read the incredible [Adafruit NeoPixel Überguide](https://learn.adafruit.com/adafruit-neopixel-uberguide).
 
 ### Wiring
 - **ESP32 5V / VIN** -> LED Strip 5V
