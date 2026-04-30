@@ -157,23 +157,23 @@ void pollingTaskCode(void * parameter) {
                     newStatus.state = doc["result"]["status"]["print_stats"]["state"].as<String>();
                     
                     float elapsed = doc["result"]["status"]["print_stats"]["print_duration"].as<float>();
-                    float progressFallback = doc["result"]["status"]["display_status"]["progress"].as<float>() * 100.0;
-                    
+                    float m73Progress = doc["result"]["status"]["display_status"]["progress"].as<float>();
                     float sdProgress = doc["result"]["status"]["virtual_sdcard"]["progress"].as<float>();
                     
                     float calcProgress = 0;
                     float eta = 0;
                     
-                    if (sdProgress > 0) {
+                    // Prioritize M73 Slicer progress (display_status) because it is linearly correlated with time.
+                    // This provides extremely accurate ETA extrapolation matching KlipperScreen.
+                    if (m73Progress > 0 && m73Progress <= 1.0) {
+                        calcProgress = m73Progress * 100.0;
+                        float estimatedTotal = elapsed / m73Progress;
+                        eta = estimatedTotal - elapsed;
+                    } else if (sdProgress > 0 && sdProgress <= 1.0) {
+                        // Fallback to file byte position if M73 is not injected
+                        calcProgress = sdProgress * 100.0;
                         float estimatedTotal = elapsed / sdProgress;
                         eta = estimatedTotal - elapsed;
-                        if (estimatedTotal > 0) {
-                            calcProgress = (elapsed / estimatedTotal) * 100.0;
-                        } else {
-                            calcProgress = 0;
-                        }
-                    } else {
-                        calcProgress = progressFallback;
                     }
                     
                     if (isnan(calcProgress)) calcProgress = 0;
