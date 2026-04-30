@@ -2,110 +2,93 @@
 
 Moonraker Monitor is a standalone ESP32-based hardware status indicator for Klipper 3D printers running Moonraker. It connects directly to your printer's Moonraker API over Wi-Fi and uses WS2812B (NeoPixel) LED strips to provide rich, real-time, highly customizable visual feedback on your printer's current state and print progress.
 
-It features a beautiful, responsive React Single-Page Application (SPA) dashboard hosted directly on the ESP32, allowing you to configure the LED animations and colors from any web browser without needing to recompile the firmware.
+It features a premium, responsive React Single-Page Application (SPA) dashboard hosted directly on the ESP32, allowing you to configure the LED animations and colors from any web browser without needing to recompile the firmware.
 
 ![Dashboard Preview](https://via.placeholder.com/800x400.png?text=Moonraker+Monitor+Dashboard) *(Dashboard preview)*
 
 ## Features
 
-- **Real-Time Polling**: Directly polls Moonraker for print progress, estimated time remaining, and system state (`printing`, `paused`, `standby`, `complete`, `error`, `cancelled`).
-- **Progress Bar Mode**: During a print, the LED strip acts as a physical progress bar, lighting up sequentially based on print completion percentage.
-- **Advanced Animations**: Powered by the `WS2812FX` library, offering 30+ hardware-accelerated LED animations (Breath, Chase, Twinkle, Fire Flicker, Dual Scan, etc.).
-- **Dual-Color Support**: Every state can be mapped to a primary and secondary color to create advanced, beautiful bi-color chase animations.
-- **On-Board React UI**: A sleek React & TailwindCSS dashboard is hosted entirely on the ESP32's internal flash storage. 
-- **Persistent NVS Storage**: All configuration changes made in the UI are securely saved to the ESP32's Non-Volatile Storage (NVS) and persist across power cycles and firmware updates.
-- **WiFiManager Integration**: No hardcoded network credentials. The ESP32 spins up its own Access Point on first boot so you can easily connect it to your home Wi-Fi network.
+- **Intelligent Progress Math**: Uses a sophisticated "math engine" that prioritizes M73 (slicer-linear) metadata for extremely accurate progress tracking, with a robust fallback to file-byte progression for legacy compatibility.
+- **Dynamic ETA Reporting**: Calculates and displays the estimated time remaining. The web dashboard also provides a localized "Finishes at" timestamp based on your browser's time.
+- **Dual-Core Processing**: Engineered for performance, the ESP32 uses Task Pinning to run Moonraker polling on **Core 0** and LED servicing/Web server on **Core 1**, ensuring zero LED flickering even during heavy network activity.
+- **7-State Awareness**: Dedicated LED mapping for `Standby`, `Preparation` (heating/homing), `Printing`, `Paused`, `Complete`, `Cancelled`, and `Error`.
+- **Advanced Animation Engine**: Powered by `WS2812FX` with support for 50+ hardware-accelerated animations. Every state supports **bi-color mapping** (Primary/Secondary) for beautiful chase and pulse effects.
+- **Premium React Dashboard**: A sleek, modern UI built with React, TypeScript, and Tailwind CSS. Features shimmer-effect progress bars and real-time state synchronization.
+- **Dual OTA Support**: Update your device wirelessly via **ArduinoOTA** (from the IDE) or using the **Web Dashboard** (by uploading a `.bin` file).
+- **WiFiManager Integration**: No hardcoded credentials. Connect to the device's Access Point to easily configure your home Wi-Fi.
 
 ## Expected Printer Compatibility
 
-Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/query`), which makes it completely hardware-agnostic. It will work "out of the box" with virtually **any 3D printer running Klipper firmware** with Moonraker installed.
+Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/query`), making it hardware-agnostic. It works with:
 
-*   **Natively Supported Printers**: Any modern printer that ships with Klipper and exposes the Moonraker API (e.g., Snapmaker U1, Sovol SV07/SV08, Elegoo Neptune 4 Series, Qidi Tech X-Max 3, FLSUN V400).
-*   **The DIY Ecosystem**: Custom builds running MainsailOS or FluiddPI (Voron, RatRig, VZBot, HevORT).
-*   **Retrofitted Printers**: Printers upgraded with a Raspberry Pi, Creality Sonic Pad, or BTT Pad 7.
-*   **Rooted Printers**: Commercial printers that have been rooted to expose native Klipper (like the Creality K1 series).
+*   **Native Klipper Printers**: Snapmaker U1, Sovol SV07/SV08, Elegoo Neptune 4, Qidi Tech X-Max 3, FLSUN V400, etc.
+*   **DIY Builds**: Voron, RatRig, VZBot running Mainsail or Fluidd.
+*   **Klipperized Upgrades**: Printers with Creality Sonic Pad, BTT Pad 7, or standard Raspberry Pi.
 
 ## Hardware Requirements
 
-1. **ESP32 Microcontroller** (e.g., ESP32 D1 Mini, NodeMCU-32S)
+1. **ESP32 Microcontroller** (e.g., ESP32 D1 Mini, NodeMCU-32S, or M5Stack ATOMS3)
 2. **WS2812B LED Strip** (NeoPixels)
-3. **5V Power Supply** (Make sure it provides enough amperage for your LED count. A rough rule of thumb is ~60mA per LED at maximum white brightness).
-4. *Optional:* Logic Level Shifter (3.3V to 5V) if your LED strip glitches when connected directly to the ESP32's 3.3V data pin.
-
-> **⚠️ Important Hardware Note**: While an ESP32 can output a 3.3V data signal and provide *some* 5V power from its `VIN` pin when connected to USB, this is only safe for a very small number of LEDs (typically < 30) at low brightness. For larger strips, you **must** use an external 5V power supply to avoid drawing too much current and destroying the microcontroller. 
-> 
-> Additionally, WS2812B LEDs technically expect a 5V data signal. While the ESP32's 3.3V signal often works, it can cause flickering or glitches on longer runs. If you experience this, use a logic level shifter (like the 74AHCT125) to boost the 3.3V signal to 5V.
->
-> For a comprehensive dive into wiring and powering LEDs correctly, please read the incredible [Adafruit NeoPixel Überguide](https://learn.adafruit.com/adafruit-neopixel-uberguide).
+3. **5V Power Supply** (Dedicated power recommended for >30 LEDs)
+4. *Optional:* Logic Level Shifter (3.3V to 5V) for signal stability.
 
 ### Wiring
 - **ESP32 5V / VIN** -> LED Strip 5V
 - **ESP32 GND** -> LED Strip GND
-- **ESP32 GPIO 16** -> LED Strip Data In (DIN) *(Pin is configurable in the Web UI)*
+- **ESP32 GPIO 16** -> LED Strip Data In (DIN) *(Configurable in UI)*
 
 ## Software Installation (PlatformIO)
 
-This project is built using [PlatformIO](https://platformio.org/). The repository contains both the C++ firmware (`/backend`) and the React frontend (`/frontend`). 
+This project consists of a C++ firmware (`/backend`) and a React frontend (`/frontend`). 
 
-> **Note**: The React frontend is already pre-compiled into static HTML/JS/CSS assets and stored in `/backend/data`. You do **not** need Node.js or `npm` installed just to flash the board!
+> **Note**: The React frontend is pre-compiled into static assets in `/backend/data`. You do **not** need Node.js to flash the board!
 
-1. Clone this repository to your local machine.
-2. Open the `/backend` folder in VSCode with the PlatformIO extension installed.
-3. Connect your ESP32 via USB.
-4. **Step 1: Flash the UI**
-   - In PlatformIO, go to the **Project Tasks** menu.
-   - Expand your environment (e.g., `esp32dev`) -> **Platform**.
-   - Click **Build Filesystem Image** then **Upload Filesystem Image**. This pushes the React UI to the ESP32's LittleFS partition.
-5. **Step 2: Flash the Firmware**
-   - Click the standard **Upload** button (right arrow in the bottom toolbar) to compile and flash the C++ firmware.
+1. Clone this repository.
+2. Open `/backend` in VSCode with **PlatformIO**.
+3. **Step 1: Flash the UI**
+   - Go to **Project Tasks** -> **Platform**.
+   - Run **Build Filesystem Image** then **Upload Filesystem Image**.
+4. **Step 2: Flash the Firmware**
+   - Click the **Upload** button to flash the C++ code.
+
+## Initial Setup
+
+1. **Connect to Wi-Fi**: Connect to the **MoonrakerMonitorAP** hotspot and enter your Wi-Fi credentials in the portal.
+2. **Access Dashboard**: Navigate to `http://<ESP32_IP_ADDRESS>` in your browser.
+3. **Configure**: 
+   - Enter your **Moonraker IP** in the Config tab.
+   - Set your **LED Count** and **LED Pin**.
+   - Map your preferred effects and colors for each state.
+   - Click **Save Configuration**.
 
 ## Over-The-Air (OTA) Updates
 
-Once Moonraker Monitor is installed and connected to your Wi-Fi, you no longer need to use a USB cable to update the firmware!
+Once Moonraker Monitor is installed and connected to your Wi-Fi, you no longer need a USB cable to update the firmware or the UI!
 
-### Option A: PlatformIO (For Developers)
-The project natively supports `ArduinoOTA`. To flash updates wirelessly:
-1. Open `backend/platformio.ini`.
-2. Uncomment `upload_protocol = espota`.
-3. Uncomment `upload_port` and set it to your ESP32's IP address.
-4. Click **Upload** or **Upload Filesystem Image** in PlatformIO.
-
-### Option B: Web Dashboard (For Users)
-If you just want to flash a `.bin` file without installing PlatformIO:
+### Option A: Web Dashboard (Recommended)
+The simplest way to update is via the built-in web update portal:
 1. Navigate to `http://<ESP32_IP_ADDRESS>/update`.
-2. Select whether you are flashing the Firmware or the Filesystem.
-3. Select your `.bin` file and click **Update**.
+2. Select the update type: **Firmware** (for `firmware.bin`) or **Filesystem** (for `littlefs.bin`).
+3. Upload the file and wait for the device to reboot.
 
-## Initial Setup & Configuration
+### Option B: PlatformIO (For Developers)
+The project natively supports `ArduinoOTA`. To flash updates wirelessly from VSCode:
+1. Open `backend/platformio.ini` and set `upload_port` to your ESP32's IP.
+2. Set `upload_protocol = espota`.
+3. Use the standard **Upload** or **Upload Filesystem Image** tasks.
 
-1. **Connect to Wi-Fi**: 
-   - Once powered on for the first time, the ESP32 will host a Wi-Fi Access Point named **MoonrakerMonitorAP**.
-   - Connect to this network on your phone or computer.
-   - A captive portal will appear (or navigate to `192.168.4.1`). Enter your home Wi-Fi credentials.
-2. **Access the Dashboard**:
-   - Once connected to your home Wi-Fi, find the ESP32's IP address on your router.
-   - Open your web browser and navigate to `http://<ESP32_IP_ADDRESS>`.
-3. **Configure the Device**:
-   - In the **Config** tab, enter your printer's **Moonraker IP**.
-   - *(Optional)* Enter your **Moonraker API Key** if your instance requires authorization.
-   - Define your **LED Pin** (Default: 16) and **LED Count**.
-   - Click **Save Configuration**. The LED strip will immediately update!
+## Development
 
-## Customizing the Dashboard (Development)
-
-If you want to modify the React dashboard interface:
-
-1. Navigate to the `/frontend` directory.
-2. Run `npm install` to install dependencies.
-3. Run `npm run dev` to start the Vite development server.
-4. When you are done making changes, run `npm run build`. This automatically compiles and copies the optimized UI assets directly into `/backend/data/`.
-5. Flash the updated UI to the ESP32 using the **Upload Filesystem Image** task in PlatformIO.
+If you wish to modify the UI:
+1. Navigate to `/frontend`.
+2. `npm install` && `npm run dev`.
+3. `npm run build` to compile assets into the backend data folder.
+4. Re-upload the Filesystem Image via PlatformIO.
 
 ## Built With
 
-*   [PlatformIO](https://platformio.org/)
-*   [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
-*   [WS2812FX](https://github.com/kitesurfer1404/WS2812FX)
-*   [ArduinoJson](https://arduinojson.org/)
-*   [React](https://reactjs.org/) & [Vite](https://vitejs.dev/)
-*   [Tailwind CSS](https://tailwindcss.com/)
+*   [PlatformIO](https://platformio.org/) & [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+*   [WS2812FX](https://github.com/kitesurfer1404/WS2812FX) (Animation Engine)
+*   [ArduinoJson](https://arduinojson.org/) (Moonraker Parsing)
+*   [React](https://reactjs.org/), [Vite](https://vitejs.dev/), & [Tailwind CSS](https://tailwindcss.com/)
+*   [Lucide React](https://lucide.dev/) (Iconography)
