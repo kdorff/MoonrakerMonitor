@@ -59,6 +59,23 @@ This project is built using [PlatformIO](https://platformio.org/). The repositor
 5. **Step 2: Flash the Firmware**
    - Click the standard **Upload** button (right arrow in the bottom toolbar) to compile and flash the C++ firmware.
 
+## Over-The-Air (OTA) Updates
+
+Once Moonraker Monitor is installed and connected to your Wi-Fi, you no longer need to use a USB cable to update the firmware!
+
+### Option A: PlatformIO (For Developers)
+The project natively supports `ArduinoOTA`. To flash updates wirelessly:
+1. Open `backend/platformio.ini`.
+2. Uncomment `upload_protocol = espota`.
+3. Uncomment `upload_port` and set it to your ESP32's IP address.
+4. Click **Upload** or **Upload Filesystem Image** in PlatformIO.
+
+### Option B: Web Dashboard (For Users)
+If you just want to flash a `.bin` file without installing PlatformIO:
+1. Navigate to `http://<ESP32_IP_ADDRESS>/update`.
+2. Select whether you are flashing the Firmware or the Filesystem.
+3. Select your `.bin` file and click **Update**.
+
 ## Initial Setup & Configuration
 
 1. **Connect to Wi-Fi**: 
