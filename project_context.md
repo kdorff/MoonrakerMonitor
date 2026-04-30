@@ -6,7 +6,7 @@ A standalone smart appliance that directly polls a 3D printer's Moonraker API to
 ## Hardware Architecture
 * **Microcontroller:** ESP32 (Dual-core).
 * **LEDs:** WS2812B 5V strip. Driven via GPIO (Default: 16).
-* **Power:** 5V shared power supply.
+* **Power:** Dedicated 5V power supply (Common Ground with ESP32).
 * **Architecture:** Uses **Core 0** for background network tasks (Moonraker polling) and **Core 1** for time-critical LED servicing and the Async Web Server. This ensures zero flickering during WiFi activity.
 
 ## Software Architecture

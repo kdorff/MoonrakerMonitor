@@ -33,9 +33,15 @@ Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/que
 4. *Optional:* Logic Level Shifter (3.3V to 5V) for signal stability.
 
 ### Wiring
-- **ESP32 5V / VIN** -> LED Strip 5V
-- **ESP32 GND** -> LED Strip GND
-- **ESP32 GPIO 16** -> LED Strip Data In (DIN) *(Configurable in UI)*
+
+Connecting LEDs directly to an ESP32 can be dangerous for your hardware if not done correctly. For anything more than a few LEDs, you **must** use an external 5V power supply and ensure a common ground.
+
+Please follow the professional wiring practices detailed in the **[Adafruit NeoPixel Überguide: Basic Connections](https://learn.adafruit.com/adafruit-neopixel-uberguide/basic-connections)**.
+
+**Key Requirements:**
+1. **Common Ground**: The Ground (GND) of your external power supply **must** be connected to a GND pin on the ESP32.
+2. **Data Resistor**: A 300-500 Ohm resistor on the data line (GPIO 16) is highly recommended to protect the first LED.
+3. **Power Injection**: For long strips, power should be injected at both ends to prevent voltage drop and color shifting.
 
 ## Software Installation (PlatformIO)
 
