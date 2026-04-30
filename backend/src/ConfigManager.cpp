@@ -1,4 +1,6 @@
 #include "ConfigManager.h"
+#include <WS2812FX.h>
+
 
 ConfigManager::ConfigManager() {
     loadDefaultConfig();
@@ -10,6 +12,8 @@ void ConfigManager::loadDefaultConfig() {
     _config.ledPin = 16;
     _config.ledCount = 5;
     _config.ledBrightness = 255;
+    _config.ledType = NEO_GRB + NEO_KHZ800;
+
 
     // Defaults based on user request
     _config.printing = { 10, 0x000000, 0x000000, 1000 };   // Multi Dynamic, Black, Black
@@ -19,6 +23,7 @@ void ConfigManager::loadDefaultConfig() {
     _config.error = { 0, 0xFF0000, 0x000000, 1000 };       // Static, Red, Black
     _config.cancelled = { 0, 0xFFA500, 0x000000, 1000 };   // Static, Orange, Black
     _config.preparation = { 1, 0x0000FF, 0x000000, 1000 }; // Blink, Blue, Black
+    _config.disconnected = { 0, 0xFF0000, 0x000000, 1000 }; // Static, Red, Black (Default same as error)
 }
 
 bool ConfigManager::begin() {
@@ -46,6 +51,8 @@ bool ConfigManager::loadConfig() {
     _config.ledPin = doc["ledPin"] | _config.ledPin;
     _config.ledCount = doc["ledCount"] | _config.ledCount;
     _config.ledBrightness = doc["ledBrightness"] | _config.ledBrightness;
+    _config.ledType = doc["ledType"] | _config.ledType;
+
 
     auto loadState = [](JsonVariantConst json, StateConfig& state) {
         if (!json.isNull()) {
@@ -63,6 +70,7 @@ bool ConfigManager::loadConfig() {
     loadState(doc["cancelled"], _config.cancelled);
     loadState(doc["printing"], _config.printing);
     loadState(doc["preparation"], _config.preparation);
+    loadState(doc["disconnected"], _config.disconnected);
 
     return true;
 }
@@ -74,6 +82,8 @@ bool ConfigManager::saveConfig() {
     doc["ledPin"] = _config.ledPin;
     doc["ledCount"] = _config.ledCount;
     doc["ledBrightness"] = _config.ledBrightness;
+    doc["ledType"] = _config.ledType;
+
 
     auto saveState = [](JsonObject json, const StateConfig& state) {
         json["effect"] = state.effect;
@@ -89,6 +99,7 @@ bool ConfigManager::saveConfig() {
     saveState(doc["cancelled"].to<JsonObject>(), _config.cancelled);
     saveState(doc["printing"].to<JsonObject>(), _config.printing);
     saveState(doc["preparation"].to<JsonObject>(), _config.preparation);
+    saveState(doc["disconnected"].to<JsonObject>(), _config.disconnected);
 
     String jsonStr;
     if (serializeJson(doc, jsonStr) == 0) {

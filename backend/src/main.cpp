@@ -42,7 +42,7 @@ void setup() {
 
     AppConfig& config = configManager.getConfig();
 
-    ws2812fx = new WS2812FX(config.ledCount, config.ledPin, NEO_GRB + NEO_KHZ800);
+    ws2812fx = new WS2812FX(config.ledCount, config.ledPin, config.ledType);
     ws2812fx->init();
     ws2812fx->setBrightness(config.ledBrightness);
     ws2812fx->setNumSegments(2); // Explicitly enable support for 2 segments
@@ -207,7 +207,7 @@ void pollingTaskCode(void * parameter) {
         
         if (failCount >= 3) {
             newStatus.connected = false;
-            newStatus.state = "error";
+            newStatus.state = "disconnected";
         }
         
         portENTER_CRITICAL(&statusMux);
@@ -224,7 +224,7 @@ void applyLedState(const PrinterStatus& status) {
     StateConfig stateConf;
     
     if (!status.connected) {
-        stateConf = config.error;
+        stateConf = config.disconnected;
     } else if (status.state == "printing") {
         if (status.progress == 0.0) {
             stateConf = config.preparation;
@@ -239,6 +239,8 @@ void applyLedState(const PrinterStatus& status) {
         stateConf = config.error;
     } else if (status.state == "cancelled") {
         stateConf = config.cancelled;
+    } else if (status.state == "disconnected" || !status.connected) {
+        stateConf = config.disconnected;
     } else { // standby and others
         stateConf = config.standby;
     }
@@ -302,6 +304,7 @@ void setupWebServer() {
         saveState(doc["cancelled"].to<JsonObject>(), config.cancelled);
         saveState(doc["printing"].to<JsonObject>(), config.printing);
         saveState(doc["preparation"].to<JsonObject>(), config.preparation);
+        saveState(doc["disconnected"].to<JsonObject>(), config.disconnected);
         
         String response;
         serializeJson(doc, response);
@@ -336,6 +339,7 @@ void setupWebServer() {
         if (jsonObj.containsKey("cancelled")) loadState(jsonObj["cancelled"].as<JsonObject>(), config.cancelled);
         if (jsonObj.containsKey("printing")) loadState(jsonObj["printing"].as<JsonObject>(), config.printing);
         if (jsonObj.containsKey("preparation")) loadState(jsonObj["preparation"].as<JsonObject>(), config.preparation);
+        if (jsonObj.containsKey("disconnected")) loadState(jsonObj["disconnected"].as<JsonObject>(), config.disconnected);
         
         configManager.saveConfig();
         

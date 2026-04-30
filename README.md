@@ -1,6 +1,7 @@
 # Moonraker Monitor
 
-Moonraker Monitor is a standalone ESP32-based hardware status indicator for Klipper 3D printers running Moonraker. It connects directly to your printer's Moonraker API over Wi-Fi and uses WS2812B (NeoPixel) LED strips to provide rich, real-time, highly customizable visual feedback on your printer's current state and print progress.
+Moonraker Monitor is a standalone ESP32-based hardware status indicator for Klipper 3D printers running Moonraker. It connects directly to your printer's Moonraker API over Wi-Fi and uses WS2812B, WS2811, or SK6812 (NeoPixel) LED strips to provide rich, real-time, highly customizable visual feedback on your printer's current state and print progress.
+
 
 It features a premium, responsive React Single-Page Application (SPA) dashboard hosted directly on the ESP32, allowing you to configure the LED animations and colors from any web browser without needing to recompile the firmware.
 
@@ -11,7 +12,9 @@ It features a premium, responsive React Single-Page Application (SPA) dashboard 
 - **Intelligent Progress Math**: Uses a sophisticated "math engine" that prioritizes M73 (slicer-linear) metadata for extremely accurate progress tracking, with a robust fallback to file-byte progression for legacy compatibility.
 - **Dynamic ETA Reporting**: Calculates and displays the estimated time remaining. The web dashboard also provides a localized "Finishes at" timestamp based on your browser's time.
 - **Dual-Core Processing**: Engineered for performance, the ESP32 uses Task Pinning to run Moonraker polling on **Core 0** and LED servicing/Web server on **Core 1**, ensuring zero LED flickering even during heavy network activity.
-- **7-State Awareness**: Dedicated LED mapping for `Standby`, `Preparation` (heating/homing), `Printing`, `Paused`, `Complete`, `Cancelled`, and `Error`.
+- **8-State Awareness**: Dedicated LED mapping for `Standby`, `Preparation` (heating/homing), `Printing`, `Paused`, `Complete`, `Cancelled`, `Error`, and `Disconnected` (cannot reach Moonraker).
+- **Configurable LED Type**: Support for various color orders (GRB, RGB, BRG) and 4-channel strips (RGBW/GRBW) directly from the web interface.
+
 - **Advanced Animation Engine**: Powered by `WS2812FX` with support for 50+ hardware-accelerated animations. Every state supports **bi-color mapping** (Primary/Secondary) for beautiful chase and pulse effects.
 - **Premium React Dashboard**: A sleek, modern UI built with React, TypeScript, and Tailwind CSS. Features shimmer-effect progress bars and real-time state synchronization.
 - **Dual OTA Support**: Update your device wirelessly via **ArduinoOTA** (from the IDE) or using the **Web Dashboard** (by uploading a `.bin` file).
@@ -28,7 +31,8 @@ Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/que
 ## Hardware Requirements
 
 1. **ESP32 Microcontroller** (e.g., ESP32 D1 Mini, NodeMCU-32S, or M5Stack ATOMS3)
-2. **WS2812B LED Strip** (NeoPixels)
+2. **LED Strip** (WS2812B, WS2811, or SK6812 RGBW)
+
 3. **5V Power Supply** (Dedicated power recommended for >30 LEDs)
 4. *Optional:* Logic Level Shifter (3.3V to 5V) for signal stability.
 
@@ -50,7 +54,8 @@ Please refer to the **[Adafruit NeoPixel Überguide: Basic Connections](https://
 
 This project consists of a C++ firmware (`/backend`) and a React frontend (`/frontend`). 
 
-> **Note**: The React frontend is pre-compiled into static assets in `/backend/data`. You do **not** need Node.js to flash the board!
+> **Note**: Building the filesystem image now automatically runs the frontend build for you! You will need **Node.js** installed on your computer to compile the UI assets.
+
 
 1. Clone this repository.
 2. Open `/backend` in VSCode with **PlatformIO**.
@@ -91,8 +96,9 @@ The project natively supports `ArduinoOTA`. To flash updates wirelessly from VSC
 If you wish to modify the UI:
 1. Navigate to `/frontend`.
 2. `npm install` && `npm run dev`.
-3. `npm run build` to compile assets into the backend data folder.
-4. Re-upload the Filesystem Image via PlatformIO.
+3. The project is configured to automatically run `npm run build` whenever you trigger a **Build Filesystem Image** task in PlatformIO.
+4. Re-upload the Filesystem Image via PlatformIO to see your changes on the device.
+
 
 ## Built With
 

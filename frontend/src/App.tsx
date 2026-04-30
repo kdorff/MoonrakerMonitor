@@ -14,7 +14,10 @@ interface Config {
   cancelled: { effect: number; color: number; color2: number; speed: number };
   printing: { effect: number; color: number; color2: number; speed: number };
   preparation: { effect: number; color: number; color2: number; speed: number };
+  disconnected: { effect: number; color: number; color2: number; speed: number };
+  ledType: number;
 }
+
 
 interface Status {
   state: string;
@@ -58,6 +61,16 @@ const EFFECTS = [
   { id: 21, name: "Twinkle Fade" },
   { id: 20, name: "Twinkle Random" },
 ];
+
+const LED_TYPES = [
+  { val: 82, name: "WS2812B / WS2811 (GRB)" },
+  { val: 6, name: "WS2811 / Some WS2812 (RGB)" },
+  { val: 88, name: "WS2811 (BRG)" },
+
+  { val: 210, name: "SK6812 (GRBW)" },
+  { val: 198, name: "SK6812 (RGBW)" },
+];
+
 
 const COLORS = [
   { val: 0x0000FF, name: "Blue" },
@@ -158,6 +171,7 @@ export default function App() {
         {status.state === 'printing' && <Activity className="text-blue-400 w-12 h-12 animate-pulse" />}
         {status.state === 'complete' && <CheckCircle className="text-green-400 w-12 h-12" />}
         {status.state === 'error' && <AlertTriangle className="text-red-400 w-12 h-12" />}
+        {status.state === 'disconnected' && <Power className="text-slate-500 w-12 h-12" />}
       </div>
 
       <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
@@ -226,13 +240,20 @@ export default function App() {
               <input type="range" min="1" max="255" value={config.ledBrightness} onChange={e => setConfig({...config, ledBrightness: parseInt(e.target.value)})} className="w-full accent-blue-500 mt-2" />
               <div className="text-right text-xs text-slate-500">{config.ledBrightness}/255</div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">LED Strip Type</label>
+              <select value={config.ledType} onChange={e => setConfig({...config, ledType: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors">
+                {LED_TYPES.map(type => <option key={type.val} value={type.val}>{type.name}</option>)}
+              </select>
+            </div>
           </div>
+
         </div>
 
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
           <h2 className="text-xl font-bold mb-4">State Effects Mapping</h2>
           <div className="space-y-4">
-            {(['preparation', 'printing', 'paused', 'standby', 'complete', 'error', 'cancelled'] as const).map(state => (
+            {(['preparation', 'printing', 'paused', 'standby', 'complete', 'error', 'cancelled', 'disconnected'] as const).map(state => (
               <div key={state} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-slate-900 p-3 rounded-xl border border-slate-700/50">
                 <span className="capitalize font-semibold text-lg">{state}</span>
                 <div className="flex flex-col gap-1">

@@ -18,6 +18,8 @@ struct AppConfig {
     uint8_t ledPin;
     uint16_t ledCount;
     uint8_t ledBrightness;
+    uint16_t ledType;
+    
     
     StateConfig error;
     StateConfig complete;
@@ -26,6 +28,7 @@ struct AppConfig {
     StateConfig cancelled;
     StateConfig printing;
     StateConfig preparation;
+    StateConfig disconnected;
 };
 
 class ConfigManager {
