@@ -8,6 +8,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <Update.h>
 #include "ConfigManager.h"
 
 ConfigManager configManager;
@@ -324,6 +325,64 @@ void setupWebServer() {
         request->send(200, "application/json", "{\"status\":\"restarting\"}");
         delay(500);
         ESP.restart();
+    });
+
+    // Web OTA endpoints
+    server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request){
+        const char* html = 
+            "<!DOCTYPE html><html><body>"
+            "<h2>Moonraker Monitor OTA Update</h2>"
+            "<form method='POST' action='/update' enctype='multipart/form-data'>"
+            "Type: <select name='type'>"
+            "<option value='flash'>Firmware (.bin)</option>"
+            "<option value='fs'>Filesystem (littlefs.bin)</option>"
+            "</select><br><br>"
+            "<input type='file' name='update'><br><br>"
+            "<input type='submit' value='Update'>"
+            "</form></body></html>";
+        request->send(200, "text/html", html);
+    });
+
+    server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request){
+        bool shouldReboot = !Update.hasError();
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "Update Success! Rebooting..." : "Update Failed");
+        response->addHeader("Connection", "close");
+        request->send(response);
+        if (shouldReboot) {
+            delay(500);
+            ESP.restart();
+        }
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if (!index) {
+            Serial.printf("Update Start: %s\n", filename.c_str());
+            int command = U_FLASH;
+            if (request->hasParam("type", true)) {
+                if (request->getParam("type", true)->value() == "fs") {
+                    command = U_SPIFFS;
+                    Serial.println("Update Type: Filesystem (U_SPIFFS)");
+                } else {
+                    Serial.println("Update Type: Firmware (U_FLASH)");
+                }
+            } else if (filename.indexOf("littlefs") != -1) {
+                command = U_SPIFFS;
+                Serial.println("Auto-detected Filesystem update from filename");
+            }
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN, command)) {
+                Update.printError(Serial);
+            }
+        }
+        if (!Update.hasError()) {
+            if (Update.write(data, len) != len) {
+                Update.printError(Serial);
+            }
+        }
+        if (final) {
+            if (Update.end(true)) {
+                Serial.printf("Update Success: %uB\n", index + len);
+            } else {
+                Update.printError(Serial);
+            }
+        }
     });
 
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
