@@ -18,6 +18,7 @@ void ConfigManager::loadDefaultConfig() {
     _config.complete = { 0, 0x00FF00, 0x000000, 1000 };    // Static, Green, Black
     _config.error = { 0, 0xFF0000, 0x000000, 1000 };       // Static, Red, Black
     _config.cancelled = { 0, 0xFFA500, 0x000000, 1000 };   // Static, Orange, Black
+    _config.preparation = { 1, 0x0000FF, 0x000000, 1000 }; // Blink, Blue, Black
 }
 
 bool ConfigManager::begin() {
@@ -61,6 +62,7 @@ bool ConfigManager::loadConfig() {
     loadState(doc["standby"], _config.standby);
     loadState(doc["cancelled"], _config.cancelled);
     loadState(doc["printing"], _config.printing);
+    loadState(doc["preparation"], _config.preparation);
 
     return true;
 }
@@ -86,6 +88,7 @@ bool ConfigManager::saveConfig() {
     saveState(doc["standby"].to<JsonObject>(), _config.standby);
     saveState(doc["cancelled"].to<JsonObject>(), _config.cancelled);
     saveState(doc["printing"].to<JsonObject>(), _config.printing);
+    saveState(doc["preparation"].to<JsonObject>(), _config.preparation);
 
     String jsonStr;
     if (serializeJson(doc, jsonStr) == 0) {

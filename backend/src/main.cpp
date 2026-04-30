@@ -226,7 +226,11 @@ void applyLedState(const PrinterStatus& status) {
     if (!status.connected) {
         stateConf = config.error;
     } else if (status.state == "printing") {
-        stateConf = config.printing;
+        if (status.progress == 0.0) {
+            stateConf = config.preparation;
+        } else {
+            stateConf = config.printing;
+        }
     } else if (status.state == "paused") {
         stateConf = config.paused;
     } else if (status.state == "complete") {
@@ -240,7 +244,7 @@ void applyLedState(const PrinterStatus& status) {
     }
 
     uint16_t activeLeds = totalLeds;
-    if (status.state == "printing" || status.state == "paused") {
+    if ((status.state == "printing" && status.progress > 0.0) || status.state == "paused") {
         activeLeds = max((uint16_t)1, (uint16_t)round((status.progress / 100.0) * totalLeds));
     }
 
@@ -297,6 +301,7 @@ void setupWebServer() {
         saveState(doc["standby"].to<JsonObject>(), config.standby);
         saveState(doc["cancelled"].to<JsonObject>(), config.cancelled);
         saveState(doc["printing"].to<JsonObject>(), config.printing);
+        saveState(doc["preparation"].to<JsonObject>(), config.preparation);
         
         String response;
         serializeJson(doc, response);
@@ -330,6 +335,7 @@ void setupWebServer() {
         if (jsonObj.containsKey("standby")) loadState(jsonObj["standby"].as<JsonObject>(), config.standby);
         if (jsonObj.containsKey("cancelled")) loadState(jsonObj["cancelled"].as<JsonObject>(), config.cancelled);
         if (jsonObj.containsKey("printing")) loadState(jsonObj["printing"].as<JsonObject>(), config.printing);
+        if (jsonObj.containsKey("preparation")) loadState(jsonObj["preparation"].as<JsonObject>(), config.preparation);
         
         configManager.saveConfig();
         

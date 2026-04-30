@@ -13,6 +13,7 @@ interface Config {
   standby: { effect: number; color: number; color2: number; speed: number };
   cancelled: { effect: number; color: number; color2: number; speed: number };
   printing: { effect: number; color: number; color2: number; speed: number };
+  preparation: { effect: number; color: number; color2: number; speed: number };
 }
 
 interface Status {
@@ -218,7 +219,7 @@ export default function App() {
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
           <h2 className="text-xl font-bold mb-4">State Effects Mapping</h2>
           <div className="space-y-4">
-            {(['printing', 'paused', 'standby', 'complete', 'error', 'cancelled'] as const).map(state => (
+            {(['preparation', 'printing', 'paused', 'standby', 'complete', 'error', 'cancelled'] as const).map(state => (
               <div key={state} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-slate-900 p-3 rounded-xl border border-slate-700/50">
                 <span className="capitalize font-semibold text-lg">{state}</span>
                 <div className="flex flex-col gap-1">

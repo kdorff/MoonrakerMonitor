@@ -25,6 +25,7 @@ struct AppConfig {
     StateConfig standby;
     StateConfig cancelled;
     StateConfig printing;
+    StateConfig preparation;
 };
 
 class ConfigManager {
