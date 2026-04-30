@@ -139,6 +139,12 @@ export default function App() {
     return `${h > 0 ? h + 'h ' : ''}${m}m`;
   };
 
+  const formatCompletionTime = (seconds: number) => {
+    if (seconds <= 0) return "";
+    const finishTime = new Date(Date.now() + seconds * 1000);
+    return finishTime.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  };
+
   const renderDashboard = () => (
     <div className="space-y-6">
       <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex items-center justify-between">
@@ -168,9 +174,16 @@ export default function App() {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-3 text-slate-300">
-          <Clock className="w-5 h-5 text-slate-400" />
-          <span className="text-lg">Estimated Time Remaining: <strong className="text-white">{formatETA(status.etaSeconds)}</strong></span>
+        <div className="mt-6 flex items-center justify-between text-slate-300">
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-slate-400" />
+            <span className="text-lg">Time Remaining: <strong className="text-white">{formatETA(status.etaSeconds)}</strong></span>
+          </div>
+          {status.etaSeconds > 0 && status.state === 'printing' && (
+            <div className="text-lg text-slate-400">
+              Finishes at <strong className="text-white">{formatCompletionTime(status.etaSeconds)}</strong>
+            </div>
+          )}
         </div>
       </div>
     </div>
