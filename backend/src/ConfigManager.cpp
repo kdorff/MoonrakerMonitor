@@ -1,36 +1,44 @@
 #include "ConfigManager.h"
 #include <WS2812FX.h>
 
-
 ConfigManager::ConfigManager() {
     loadDefaultConfig();
 }
 
+/**
+ * @brief Initialize the AppConfig struct with hardcoded factory defaults.
+ */
 void ConfigManager::loadDefaultConfig() {
     _config.moonrakerIP = "192.168.1.41";
     _config.moonrakerApiKey = "";
     _config.ledPin = 16;
     _config.ledCount = 5;
     _config.ledBrightness = 255;
-    _config.ledType = NEO_GRB + NEO_KHZ800;
+    _config.ledType = NEO_GRB + NEO_KHZ800; // Default to most common WS2812B type
 
-
-    // Defaults based on user request
-    _config.printing = { 10, 0x000000, 0x000000, 1000 };   // Multi Dynamic, Black, Black
-    _config.paused = { 2, 0xFFFF00, 0x000000, 1000 };      // Breath, Yellow, Black
-    _config.standby = { 0, 0x4B0082, 0x000000, 1000 };     // Static, Indigo, Black
-    _config.complete = { 0, 0x00FF00, 0x000000, 1000 };    // Static, Green, Black
-    _config.error = { 0, 0xFF0000, 0x000000, 1000 };       // Static, Red, Black
-    _config.cancelled = { 0, 0xFFA500, 0x000000, 1000 };   // Static, Orange, Black
-    _config.preparation = { 1, 0x0000FF, 0x000000, 1000 }; // Blink, Blue, Black
-    _config.disconnected = { 0, 0xFF0000, 0x000000, 1000 }; // Static, Red, Black (Default same as error)
+    // Default LED effect mappings for each printer state
+    _config.printing = { 10, 0x000000, 0x000000, 1000 };   // Multi Dynamic (Off)
+    _config.paused = { 2, 0xFFFF00, 0x000000, 1000 };      // Breath Yellow
+    _config.standby = { 0, 0x4B0082, 0x000000, 1000 };     // Static Indigo
+    _config.complete = { 0, 0x00FF00, 0x000000, 1000 };    // Static Green
+    _config.error = { 0, 0xFF0000, 0x000000, 1000 };       // Static Red
+    _config.cancelled = { 0, 0xFFA500, 0x000000, 1000 };   // Static Orange
+    _config.preparation = { 1, 0x0000FF, 0x000000, 1000 }; // Blink Blue
+    _config.disconnected = { 0, 0xFF0000, 0x000000, 1000 }; // Static Red (Same as Error by default)
 }
 
+/**
+ * @brief Open the "moonraker" NVS namespace.
+ */
 bool ConfigManager::begin() {
-    _preferences.begin("moonraker", false);
+    _preferences.begin("moonraker", false); // false = read/write
     return loadConfig();
 }
 
+/**
+ * @brief Loads the config from NVS by reading a single "cfg" JSON string.
+ * This approach is more flexible than saving each field individually to NVS.
+ */
 bool ConfigManager::loadConfig() {
     String jsonStr = _preferences.getString("cfg", "");
     if (jsonStr == "") {
@@ -46,6 +54,7 @@ bool ConfigManager::loadConfig() {
         return false;
     }
 
+    // Load top-level device settings
     _config.moonrakerIP = doc["moonrakerIP"] | _config.moonrakerIP;
     _config.moonrakerApiKey = doc["moonrakerApiKey"] | _config.moonrakerApiKey;
     _config.ledPin = doc["ledPin"] | _config.ledPin;
@@ -53,7 +62,9 @@ bool ConfigManager::loadConfig() {
     _config.ledBrightness = doc["ledBrightness"] | _config.ledBrightness;
     _config.ledType = doc["ledType"] | _config.ledType;
 
-
+    /**
+     * Helper lambda to safely extract state configuration from a JSON object.
+     */
     auto loadState = [](JsonVariantConst json, StateConfig& state) {
         if (!json.isNull()) {
             state.effect = json["effect"] | state.effect;
@@ -63,6 +74,7 @@ bool ConfigManager::loadConfig() {
         }
     };
 
+    // Populate all state objects
     loadState(doc["error"], _config.error);
     loadState(doc["complete"], _config.complete);
     loadState(doc["paused"], _config.paused);
@@ -75,6 +87,9 @@ bool ConfigManager::loadConfig() {
     return true;
 }
 
+/**
+ * @brief Serializes the config struct to a JSON string and writes it to NVS.
+ */
 bool ConfigManager::saveConfig() {
     JsonDocument doc;
     doc["moonrakerIP"] = _config.moonrakerIP;
@@ -84,7 +99,9 @@ bool ConfigManager::saveConfig() {
     doc["ledBrightness"] = _config.ledBrightness;
     doc["ledType"] = _config.ledType;
 
-
+    /**
+     * Helper lambda to convert a StateConfig struct back into a JSON object.
+     */
     auto saveState = [](JsonObject json, const StateConfig& state) {
         json["effect"] = state.effect;
         json["color"] = state.color;
@@ -92,6 +109,7 @@ bool ConfigManager::saveConfig() {
         json["speed"] = state.speed;
     };
 
+    // Convert each state struct into a nested JSON object
     saveState(doc["error"].to<JsonObject>(), _config.error);
     saveState(doc["complete"].to<JsonObject>(), _config.complete);
     saveState(doc["paused"].to<JsonObject>(), _config.paused);
@@ -107,6 +125,7 @@ bool ConfigManager::saveConfig() {
         return false;
     }
     
+    // Save the entire JSON string to a single NVS key
     _preferences.putString("cfg", jsonStr);
     return true;
 }
@@ -114,3 +133,4 @@ bool ConfigManager::saveConfig() {
 AppConfig& ConfigManager::getConfig() {
     return _config;
 }
+

@@ -1,3 +1,15 @@
+/**
+ * @file main.cpp
+ * @brief Entry point for the Moonraker Monitor firmware.
+ * 
+ * This system uses a dual-core architecture:
+ * - Core 0: Background networking (polling Moonraker API).
+ * - Core 1: Time-critical tasks (LED servicing, Web Server, ArduinoOTA).
+ * 
+ * This separation ensures that network latency or heavy JSON parsing doesn't 
+ * cause the LED animations to flicker or stutter.
+ */
+
 #include <Arduino.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
@@ -12,22 +24,28 @@
 #include <ArduinoOTA.h>
 #include "ConfigManager.h"
 
+// Global instances
 ConfigManager configManager;
 AsyncWebServer server(80);
 WS2812FX* ws2812fx = nullptr;
 
+/**
+ * @struct PrinterStatus
+ * @brief Holds the current state of the printer as retrieved from Moonraker.
+ */
 struct PrinterStatus {
-    String state = "standby";
-    float progress = 0.0;
-    float etaSeconds = 0.0;
-    bool connected = false;
+    String state = "standby"; ///< Current printer state (printing, standby, complete, etc.)
+    float progress = 0.0;    ///< Calculated print progress (0-100)
+    float etaSeconds = 0.0;  ///< Estimated time remaining in seconds
+    bool connected = false;  ///< Whether the last Moonraker poll was successful
 };
 
 PrinterStatus currentStatus;
-portMUX_TYPE statusMux = portMUX_INITIALIZER_UNLOCKED;
+portMUX_TYPE statusMux = portMUX_INITIALIZER_UNLOCKED; ///< Mutex for sharing status between cores
 
 TaskHandle_t PollingTask;
 
+// Forward declarations
 void setupWebServer();
 void applyLedState(const PrinterStatus& status);
 void pollingTaskCode(void * parameter);
@@ -36,49 +54,54 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
 
+    // Initialize configuration
     if (!configManager.begin()) {
         Serial.println("ConfigManager failed to initialize");
     }
 
     AppConfig& config = configManager.getConfig();
 
+    // Initialize LED strip using configured parameters
     ws2812fx = new WS2812FX(config.ledCount, config.ledPin, config.ledType);
     ws2812fx->init();
     ws2812fx->setBrightness(config.ledBrightness);
-    ws2812fx->setNumSegments(2); // Explicitly enable support for 2 segments
+    
+    // We use two segments: 
+    // Segment 0: Active LEDs representing print progress
+    // Segment 1: Inactive LEDs (usually black/off)
+    ws2812fx->setNumSegments(2); 
     ws2812fx->setSegment(0, 0, config.ledCount - 1, FX_MODE_COLOR_WIPE, (uint32_t)0x000000, 1000);
     ws2812fx->start();
 
+    // Initialize Wi-Fi (WiFiManager)
     setupWiFi();
 
-    // Start ArduinoOTA after Wi-Fi connects
+    // Configure ArduinoOTA for wireless flashing from PlatformIO
     ArduinoOTA.setHostname("MoonrakerMonitor");
-    ArduinoOTA.onStart([]() {
-        Serial.println("ArduinoOTA Start");
-    });
-    ArduinoOTA.onEnd([]() {
-        Serial.println("\nArduinoOTA End");
-    });
+    ArduinoOTA.onStart([]() { Serial.println("ArduinoOTA Start"); });
+    ArduinoOTA.onEnd([]() { Serial.println("\nArduinoOTA End"); });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
         Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
     });
     ArduinoOTA.onError([](ota_error_t error) {
         Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR) Serial.println("End Failed");
     });
     ArduinoOTA.begin();
 
+    // Initialize Filesystem for the web dashboard
     if (!LittleFS.begin(true)) {
         Serial.println("LittleFS Mount Failed");
     }
 
+    // Initialize Web Server
     setupWebServer();
     
-    // Start Polling Task on Core 0 (Loop runs on Core 1)
+    /**
+     * @brief Pin the Polling Task to Core 0.
+     * The main loop() runs on Core 1 by default. By putting the network polling 
+     * on Core 0, we prevent network-related delays from affecting the LED timings 
+     * which are serviced in loop().
+     */
     xTaskCreatePinnedToCore(
         pollingTaskCode,
         "PollingTask",
@@ -90,20 +113,24 @@ void setup() {
 }
 
 void loop() {
-    processWiFi();
-    ArduinoOTA.handle();
-    ws2812fx->service();
+    processWiFi();      ///< Background Wi-Fi maintenance
+    ArduinoOTA.handle(); ///< Process incoming OTA updates
+    ws2812fx->service(); ///< Service the LED animation engine
 
     static unsigned long lastUpdate = 0;
     static PrinterStatus lastLedStatus;
     
-    if (millis() - lastUpdate > 500) { // Check for updates 2 times a second
+    // Periodically sync the LED state with the current printer status
+    if (millis() - lastUpdate > 500) { 
         lastUpdate = millis();
         PrinterStatus localStatus;
+        
+        // Use critical section to safely copy data modified by Core 0
         portENTER_CRITICAL(&statusMux);
         localStatus = currentStatus;
         portEXIT_CRITICAL(&statusMux);
         
+        // Only trigger an update if the state has meaningfully changed
         if (localStatus.state != lastLedStatus.state || 
             abs(localStatus.progress - lastLedStatus.progress) > 0.1 ||
             localStatus.connected != lastLedStatus.connected) {
@@ -114,6 +141,9 @@ void loop() {
     }
 }
 
+/**
+ * @brief Core 0 Task responsible for polling the Moonraker API.
+ */
 void pollingTaskCode(void * parameter) {
     for(;;) {
         AppConfig& config = configManager.getConfig();
@@ -121,6 +151,8 @@ void pollingTaskCode(void * parameter) {
         
         static int failCount = 0;
         PrinterStatus newStatus;
+        
+        // Copy current state to preserve progress/eta if poll fails
         portENTER_CRITICAL(&statusMux);
         newStatus = currentStatus;
         portEXIT_CRITICAL(&statusMux);
@@ -128,12 +160,13 @@ void pollingTaskCode(void * parameter) {
         if (WiFi.status() == WL_CONNECTED && ip.length() > 0) {
             WiFiClient wifiClient;
             HTTPClient http;
-            http.setTimeout(5000); // 5 second timeout
-            http.useHTTP10(true);  // Force HTTP/1.0 to prevent chunked encoding timeout issues (-11)
+            http.setTimeout(5000);
+            
+            // NOTE: Using HTTP/1.0 avoids certain chunked encoding issues with Moonraker 
+            // that can lead to timeout errors in some network environments.
+            http.useHTTP10(true); 
             
             String url = "http://" + ip + "/printer/objects/query?print_stats&display_status&virtual_sdcard";
-            
-            // Allow user to include port in the IP if necessary (e.g. 192.168.1.41:7125)
             if (!ip.startsWith("http://") && !ip.startsWith("https://")) {
                 url = "http://" + ip + "/printer/objects/query?print_stats&display_status&virtual_sdcard";
             } else {
@@ -144,8 +177,8 @@ void pollingTaskCode(void * parameter) {
             if (config.moonrakerApiKey.length() > 0) {
                 http.addHeader("X-Api-Key", config.moonrakerApiKey);
             }
-            int httpCode = http.GET();
             
+            int httpCode = http.GET();
             if (httpCode == 200) {
                 failCount = 0;
                 String payload = http.getString();
@@ -163,14 +196,18 @@ void pollingTaskCode(void * parameter) {
                     float calcProgress = 0;
                     float eta = 0;
                     
-                    // Prioritize M73 Slicer progress (display_status) because it is linearly correlated with time.
-                    // This provides extremely accurate ETA extrapolation matching KlipperScreen.
+                    /**
+                     * PROGRESS MATH LOGIC:
+                     * 1. Prioritize M73 Slicer progress (display_status). It tracks time-based 
+                     *    progression injected by the slicer, making it much more linear and accurate.
+                     * 2. Fallback to SD progress (virtual_sdcard). It tracks file byte position. 
+                     *    This is less accurate (G-code bytes != print time) but works for any file.
+                     */
                     if (m73Progress > 0 && m73Progress <= 1.0) {
                         calcProgress = m73Progress * 100.0;
                         float estimatedTotal = elapsed / m73Progress;
                         eta = estimatedTotal - elapsed;
                     } else if (sdProgress > 0 && sdProgress <= 1.0) {
-                        // Fallback to file byte position if M73 is not injected
                         calcProgress = sdProgress * 100.0;
                         float estimatedTotal = elapsed / sdProgress;
                         eta = estimatedTotal - elapsed;
@@ -179,37 +216,31 @@ void pollingTaskCode(void * parameter) {
                     if (isnan(calcProgress)) calcProgress = 0;
                     if (isnan(eta)) eta = 0;
                     
+                    // Prevent showing 100% on the LED strip while the state is still "printing"
                     if (newStatus.state == "printing" && calcProgress >= 100.0) {
                         calcProgress = 99.9;
                     }
-                    if (calcProgress < 0) calcProgress = 0;
-                    if (calcProgress > 100) calcProgress = 100;
                     
                     newStatus.progress = calcProgress;
                     newStatus.etaSeconds = eta > 0 ? eta : 0;
                 } else {
-                    Serial.println("Failed to parse JSON from Moonraker");
                     failCount++;
                 }
             } else {
-                Serial.printf("HTTP Request failed, code: %d\n", httpCode);
                 failCount++;
             }
             http.end();
         } else {
-            if (ip.length() == 0) {
-                Serial.println("No Moonraker IP configured.");
-            } else {
-                Serial.println("Wi-Fi disconnected.");
-            }
             failCount++;
         }
         
+        // Consider disconnected after 3 failed polls to prevent flickering on temporary jitter
         if (failCount >= 3) {
             newStatus.connected = false;
             newStatus.state = "disconnected";
         }
         
+        // Safely update the global status
         portENTER_CRITICAL(&statusMux);
         currentStatus = newStatus;
         portEXIT_CRITICAL(&statusMux);
@@ -218,19 +249,20 @@ void pollingTaskCode(void * parameter) {
     }
 }
 
+/**
+ * @brief Logic for mapping printer status to specific LED segments and effects.
+ */
 void applyLedState(const PrinterStatus& status) {
     AppConfig& config = configManager.getConfig();
     uint16_t totalLeds = config.ledCount;
     StateConfig stateConf;
     
+    // Choose the appropriate state mapping
     if (!status.connected) {
         stateConf = config.disconnected;
     } else if (status.state == "printing") {
-        if (status.progress == 0.0) {
-            stateConf = config.preparation;
-        } else {
-            stateConf = config.printing;
-        }
+        // If printing but progress is 0.0, we are likely heating or homing
+        stateConf = (status.progress == 0.0) ? config.preparation : config.printing;
     } else if (status.state == "paused") {
         stateConf = config.paused;
     } else if (status.state == "complete") {
@@ -239,22 +271,21 @@ void applyLedState(const PrinterStatus& status) {
         stateConf = config.error;
     } else if (status.state == "cancelled") {
         stateConf = config.cancelled;
-    } else if (status.state == "disconnected" || !status.connected) {
-        stateConf = config.disconnected;
-    } else { // standby and others
+    } else { 
         stateConf = config.standby;
     }
 
+    // Determine how many LEDs should be active based on progress
     uint16_t activeLeds = totalLeds;
     if ((status.state == "printing" && status.progress > 0.0) || status.state == "paused") {
         activeLeds = max((uint16_t)1, (uint16_t)round((status.progress / 100.0) * totalLeds));
     }
 
-    // Set first segment for active progress
+    // Segment 0: Progress segment
     uint32_t colors[] = { (uint32_t)stateConf.color, (uint32_t)stateConf.color2, 0 };
     ws2812fx->setSegment(0, 0, activeLeds - 1, stateConf.effect, colors, stateConf.speed, false);
     
-    // Set second segment to off/black if not full length
+    // Segment 1: "Shadow" segment for remaining LEDs (Background)
     if (activeLeds < totalLeds) {
         ws2812fx->setSegment(1, activeLeds, totalLeds - 1, FX_MODE_STATIC, (uint32_t)0x000000, 1000);
         ws2812fx->addActiveSegment(1);
@@ -263,7 +294,11 @@ void applyLedState(const PrinterStatus& status) {
     }
 }
 
+/**
+ * @brief Initialize all HTTP API endpoints for the dashboard.
+ */
 void setupWebServer() {
+    // Current printer status for the Dashboard tab
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request){
         PrinterStatus localStatus;
         portENTER_CRITICAL(&statusMux);
@@ -281,6 +316,7 @@ void setupWebServer() {
         request->send(200, "application/json", response);
     });
     
+    // Fetch current configuration for the Config tab
     server.on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request){
         AppConfig& config = configManager.getConfig();
         JsonDocument doc;
@@ -289,6 +325,7 @@ void setupWebServer() {
         doc["ledPin"] = config.ledPin;
         doc["ledCount"] = config.ledCount;
         doc["ledBrightness"] = config.ledBrightness;
+        doc["ledType"] = config.ledType;
         
         auto saveState = [](JsonObject json, const StateConfig& state) {
             json["effect"] = state.effect;
@@ -311,7 +348,7 @@ void setupWebServer() {
         request->send(200, "application/json", response);
     });
     
-    // Handle JSON body for POST /api/config
+    // Save new configuration from the web UI
     server.addHandler(new AsyncCallbackJsonWebHandler("/api/config", [](AsyncWebServerRequest *request, JsonVariant &json) {
         AppConfig& config = configManager.getConfig();
         JsonObject jsonObj = json.as<JsonObject>();
@@ -320,9 +357,10 @@ void setupWebServer() {
         if (jsonObj.containsKey("moonrakerApiKey")) config.moonrakerApiKey = jsonObj["moonrakerApiKey"].as<String>();
         if (jsonObj.containsKey("ledPin")) config.ledPin = jsonObj["ledPin"].as<uint8_t>();
         if (jsonObj.containsKey("ledCount")) config.ledCount = jsonObj["ledCount"].as<uint16_t>();
+        if (jsonObj.containsKey("ledType")) config.ledType = jsonObj["ledType"].as<uint16_t>();
         if (jsonObj.containsKey("ledBrightness")) {
             config.ledBrightness = jsonObj["ledBrightness"].as<uint8_t>();
-            ws2812fx->setBrightness(config.ledBrightness); // Apply dynamically!
+            ws2812fx->setBrightness(config.ledBrightness);
         }
         
         auto loadState = [](JsonObject json, StateConfig& state) {
@@ -343,7 +381,7 @@ void setupWebServer() {
         
         configManager.saveConfig();
         
-        // Immediately apply the new config to the current state
+        // Apply changes immediately to the LEDs
         PrinterStatus currentLocalStatus;
         portENTER_CRITICAL(&statusMux);
         currentLocalStatus = currentStatus;
@@ -353,14 +391,14 @@ void setupWebServer() {
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     }));
 
-    // Handle restart
+    // Trigger device reboot
     server.on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request){
         request->send(200, "application/json", "{\"status\":\"restarting\"}");
         delay(500);
         ESP.restart();
     });
 
-    // Web OTA endpoints
+    // Simple built-in update UI for Web OTA
     server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request){
         const char* html = 
             "<!DOCTYPE html><html><body>"
@@ -376,6 +414,7 @@ void setupWebServer() {
         request->send(200, "text/html", html);
     });
 
+    // Handle the OTA upload stream
     server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request){
         bool shouldReboot = !Update.hasError();
         AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "Update Success! Rebooting..." : "Update Failed");
@@ -387,48 +426,22 @@ void setupWebServer() {
         }
     }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
         if (!index) {
-            Serial.printf("Update Start: %s\n", filename.c_str());
             int command = U_FLASH;
-            if (request->hasParam("type", true)) {
-                if (request->getParam("type", true)->value() == "fs") {
-                    command = U_SPIFFS;
-                    Serial.println("Update Type: Filesystem (U_SPIFFS)");
-                } else {
-                    Serial.println("Update Type: Firmware (U_FLASH)");
-                }
+            if (request->hasParam("type", true) && request->getParam("type", true)->value() == "fs") {
+                command = U_SPIFFS;
             } else if (filename.indexOf("littlefs") != -1) {
                 command = U_SPIFFS;
-                Serial.println("Auto-detected Filesystem update from filename");
             }
-            if (!Update.begin(UPDATE_SIZE_UNKNOWN, command)) {
-                Update.printError(Serial);
-            }
+            Update.begin(UPDATE_SIZE_UNKNOWN, command);
         }
-        if (!Update.hasError()) {
-            if (Update.write(data, len) != len) {
-                Update.printError(Serial);
-            }
-        }
-        if (final) {
-            if (Update.end(true)) {
-                Serial.printf("Update Success: %uB\n", index + len);
-            } else {
-                Update.printError(Serial);
-            }
-        }
+        if (!Update.hasError()) Update.write(data, len);
+        if (final) Update.end(true);
     });
 
+    // Serve the React frontend from LittleFS
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
-    // Pre-flight CORS for API
-    server.onNotFound([](AsyncWebServerRequest *request) {
-        if (request->method() == HTTP_OPTIONS) {
-            request->send(200);
-        } else {
-            request->send(404, "text/plain", "Not found");
-        }
-    });
-
+    // Enable CORS for development
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "content-type");
 

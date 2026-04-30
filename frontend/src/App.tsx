@@ -1,12 +1,26 @@
+/**
+ * @file App.tsx
+ * @brief Main React application for the Moonraker Monitor web dashboard.
+ * 
+ * Provides real-time printer status visualization and a comprehensive 
+ * configuration interface for managing LED effects and device settings.
+ */
+
 import { useEffect, useState } from 'react';
 import { Activity, CheckCircle, AlertTriangle, Clock, Settings, Save, RefreshCw, Power } from 'lucide-react';
 
+/**
+ * @interface Config
+ * @brief Represents the global application configuration structure.
+ * Matches the AppConfig struct in the C++ backend.
+ */
 interface Config {
   moonrakerIP: string;
   moonrakerApiKey: string;
   ledPin: number;
   ledCount: number;
   ledBrightness: number;
+  // State-specific LED configurations
   error: { effect: number; color: number; color2: number; speed: number };
   complete: { effect: number; color: number; color2: number; speed: number };
   paused: { effect: number; color: number; color2: number; speed: number };
@@ -15,17 +29,21 @@ interface Config {
   printing: { effect: number; color: number; color2: number; speed: number };
   preparation: { effect: number; color: number; color2: number; speed: number };
   disconnected: { effect: number; color: number; color2: number; speed: number };
-  ledType: number;
+  ledType: number; // Bitmask for Adafruit_NeoPixel type
 }
 
-
+/**
+ * @interface Status
+ * @brief Represents the current printer status returned by the backend API.
+ */
 interface Status {
-  state: string;
-  progress: number;
-  etaSeconds: number;
-  connected: boolean;
+  state: string;       ///< Current state string (printing, standby, etc.)
+  progress: number;    ///< Percent progress (0-100)
+  etaSeconds: number;  ///< Estimated time remaining
+  connected: boolean;  ///< Connection status to Moonraker
 }
 
+// Supported WS2812FX effects
 const EFFECTS = [
   { id: 0, name: "Static" },
   { id: 53, name: "Bicolor Chase" },
@@ -62,16 +80,16 @@ const EFFECTS = [
   { id: 20, name: "Twinkle Random" },
 ];
 
+// Mapping of Adafruit_NeoPixel constants to human-readable names
 const LED_TYPES = [
   { val: 82, name: "WS2812B / WS2811 (GRB)" },
   { val: 6, name: "WS2811 / Some WS2812 (RGB)" },
   { val: 88, name: "WS2811 (BRG)" },
-
   { val: 210, name: "SK6812 (GRBW)" },
   { val: 198, name: "SK6812 (RGBW)" },
 ];
 
-
+// Curated color palette
 const COLORS = [
   { val: 0x0000FF, name: "Blue" },
   { val: 0x00FFFF, name: "Cyan" },
@@ -96,30 +114,42 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'config'>('dashboard');
   const [saving, setSaving] = useState(false);
 
+  /**
+   * Initialize and start polling
+   */
   useEffect(() => {
     fetchConfig();
     const interval = setInterval(fetchStatus, 1000);
     return () => clearInterval(interval);
   }, []);
 
+  /**
+   * Retrieve current printer status from the ESP32 API
+   */
   const fetchStatus = async () => {
     try {
       const res = await fetch('/api/status');
       if (res.ok) setStatus(await res.json());
     } catch (e) {
-      // console.error("Error fetching status", e);
+      // Fail silently to prevent UI noise during temporary disconnections
     }
   };
 
+  /**
+   * Retrieve device configuration from the ESP32 API
+   */
   const fetchConfig = async () => {
     try {
       const res = await fetch('/api/config');
       if (res.ok) setConfig(await res.json());
     } catch (e) {
-      // console.error("Error fetching config", e);
+      console.error("Error fetching config", e);
     }
   };
 
+  /**
+   * Submit updated configuration to the ESP32
+   */
   const handleSaveConfig = async () => {
     if (!config) return;
     setSaving(true);
@@ -136,6 +166,9 @@ export default function App() {
     setSaving(false);
   };
 
+  /**
+   * Request a system restart
+   */
   const handleRestart = async () => {
     if (confirm("Restart ESP32?")) {
       try {
@@ -145,6 +178,9 @@ export default function App() {
     }
   };
 
+  /**
+   * Formats seconds into a human-readable duration (e.g., "1h 23m")
+   */
   const formatETA = (seconds: number) => {
     if (seconds <= 0) return "Done";
     const h = Math.floor(seconds / 3600);
@@ -152,14 +188,21 @@ export default function App() {
     return `${h > 0 ? h + 'h ' : ''}${m}m`;
   };
 
+  /**
+   * Calculates local completion time based on remaining seconds
+   */
   const formatCompletionTime = (seconds: number) => {
     if (seconds <= 0) return "";
     const finishTime = new Date(Date.now() + seconds * 1000);
     return finishTime.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
   };
 
+  /**
+   * RENDER: Dashboard Tab
+   */
   const renderDashboard = () => (
     <div className="space-y-6">
+      {/* State Card */}
       <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex items-center justify-between">
         <div>
           <h2 className="text-sm text-slate-400 font-semibold uppercase tracking-wider">Printer State</h2>
@@ -174,11 +217,13 @@ export default function App() {
         {status.state === 'disconnected' && <Power className="text-slate-500 w-12 h-12" />}
       </div>
 
+      {/* Progress Card */}
       <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
         <div className="flex justify-between items-end mb-4">
           <h2 className="text-xl font-semibold">Progress</h2>
           <span className="text-3xl font-bold text-blue-400">{status.progress.toFixed(1)}%</span>
         </div>
+        {/* Shimmer Effect Progress Bar */}
         <div className="w-full bg-slate-900 rounded-full h-6 overflow-hidden border border-slate-700 relative">
           <div 
             className="bg-gradient-to-r from-blue-600 to-cyan-400 h-6 transition-all duration-500 ease-out relative"
@@ -188,6 +233,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* ETA Section */}
         <div className="mt-6 flex items-center justify-between text-slate-300">
           <div className="flex items-center gap-3">
             <Clock className="w-5 h-5 text-slate-400" />
@@ -203,9 +249,15 @@ export default function App() {
     </div>
   );
 
+  /**
+   * RENDER: Config Tab
+   */
   const renderConfig = () => {
     if (!config) return <div className="text-center p-10 animate-pulse">Loading Config...</div>;
 
+    /**
+     * Updates a nested state configuration property
+     */
     const updateStateFX = (stateName: keyof Config, field: string, val: number) => {
       setConfig(prev => {
         if (!prev) return prev;
@@ -216,6 +268,7 @@ export default function App() {
 
     return (
       <div className="space-y-6">
+        {/* Hardware & Network Settings */}
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Settings className="w-5 h-5"/> Device Settings</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -247,9 +300,9 @@ export default function App() {
               </select>
             </div>
           </div>
-
         </div>
 
+        {/* Animation Mapping Settings */}
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
           <h2 className="text-xl font-bold mb-4">State Effects Mapping</h2>
           <div className="space-y-4">
@@ -276,6 +329,7 @@ export default function App() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] text-slate-400 uppercase tracking-wider">Speed</span>
+                  {/* Speed is inverted in UI: Slider RIGHT = Lower ms = FASTER animation */}
                   <input type="range" min="100" max="5000" value={5100 - config[state].speed} onChange={e => updateStateFX(state, 'speed', 5100 - parseInt(e.target.value))} className="w-full accent-blue-500" />
                 </div>
               </div>
@@ -283,6 +337,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* Action Buttons */}
         <div className="flex justify-end gap-4">
           <button onClick={handleRestart} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg flex items-center gap-2 transition-colors">
             <Power className="w-4 h-4" /> Restart
@@ -295,6 +350,9 @@ export default function App() {
     );
   };
 
+  /**
+   * MAIN RENDER
+   */
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8">
       <header className="flex justify-between items-center mb-8">
