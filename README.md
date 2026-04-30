@@ -34,12 +34,15 @@ Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/que
 
 ### Wiring
 
-Connecting LEDs directly to an ESP32 can be dangerous for your hardware if not done correctly. For anything more than a few LEDs, you **must** use an external 5V power supply and ensure a common ground.
+While the ESP32 and LED strip can share the same 5V power supply, you should avoid drawing high current **through** the ESP32's pins (VCC/VIN). 
 
-Please follow the professional wiring practices detailed in the **[Adafruit NeoPixel Überguide: Basic Connections](https://learn.adafruit.com/adafruit-neopixel-uberguide/basic-connections)**.
+*   **For Testing**: A very short string (< 10 LEDs) can be powered directly from the ESP32's 5V pin for temporary testing.
+*   **For Production**: You should run separate power wires from your 5V supply directly to the LED strip. Drawing too much current through the ESP32 can overheat the board or damage its internal traces.
+
+Please refer to the **[Adafruit NeoPixel Überguide: Basic Connections](https://learn.adafruit.com/adafruit-neopixel-uberguide/basic-connections)** for best practices.
 
 **Key Requirements:**
-1. **Common Ground**: The Ground (GND) of your external power supply **must** be connected to a GND pin on the ESP32.
+1. **Common Ground**: Always ensure the Ground (GND) of your power supply, LED strip, and ESP32 are all connected together.
 2. **Data Resistor**: A 300-500 Ohm resistor on the data line (GPIO 16) is highly recommended to protect the first LED.
 3. **Power Injection**: For long strips, power should be injected at both ends to prevent voltage drop and color shifting.
 
