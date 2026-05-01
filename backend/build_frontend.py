@@ -1,11 +1,10 @@
-/**
- * @file build_frontend.py
- * @brief PlatformIO Extra Script for automating the frontend build.
- * 
- * This script is triggered whenever a filesystem-related task is called 
- * (buildfs or uploadfs). It ensures that the React frontend is compiled 
- * into static assets before they are packed into the LittleFS image.
- */
+"""
+@file build_frontend.py
+@brief PlatformIO Extra Script for automating the frontend build.
+
+Ensures the React frontend is compiled into static assets before 
+LittleFS image creation (buildfs/uploadfs).
+"""
 
 Import("env")
 import subprocess

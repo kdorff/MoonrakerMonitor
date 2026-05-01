@@ -166,11 +166,12 @@ void pollingTaskCode(void * parameter) {
             // that can lead to timeout errors in some network environments.
             http.useHTTP10(true); 
             
-            String url = "http://" + ip + "/printer/objects/query?print_stats&display_status&virtual_sdcard";
+            String url;
+            String query = "/printer/objects/query?print_stats&display_status&virtual_sdcard";
             if (!ip.startsWith("http://") && !ip.startsWith("https://")) {
-                url = "http://" + ip + "/printer/objects/query?print_stats&display_status&virtual_sdcard";
+                url = "http://" + ip + query;
             } else {
-                url = ip + "/printer/objects/query?print_stats&display_status&virtual_sdcard";
+                url = ip + query;
             }
             
             http.begin(wifiClient, url);

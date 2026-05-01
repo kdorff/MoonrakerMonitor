@@ -11,8 +11,17 @@ ConfigManager::ConfigManager() {
 void ConfigManager::loadDefaultConfig() {
     _config.moonrakerIP = "192.168.1.41";
     _config.moonrakerApiKey = "";
+#ifdef LED_PIN
+    _config.ledPin = LED_PIN;
+#else
     _config.ledPin = 16;
+#endif
+
+#ifdef LED_COUNT
+    _config.ledCount = LED_COUNT;
+#else
     _config.ledCount = 5;
+#endif
     _config.ledBrightness = 255;
     _config.ledType = NEO_GRB + NEO_KHZ800; // Default to most common WS2812B type
 
