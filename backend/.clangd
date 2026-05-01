@@ -1,0 +1,30 @@
+CompileFlags:
+  # Force a target that standard clangd understands (ARM 32-bit)
+  # This allows indexing to work on macOS/Linux while keeping ESP32 headers.
+  Add: 
+    - "--target=arm-none-eabi"
+    - "-Wno-unknown-argument"
+    - "-D__ESP32__"
+    - "-D__XTENSA__"  # Required by ESP32 system headers to enable POSIX features
+    - "-D_POSIX_THREADS"
+    - "-D_POSIX_READER_WRITER_LOCKS"
+    - "-D__GNUC__=8"
+    - "-D__cplusplus=201103L"
+    
+    # Manually provide the system include paths from the ESP32 toolchain
+    - "-isystem"
+    - "/Users/kevin/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0"
+    - "-isystem"
+    - "/Users/kevin/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include/c++/8.4.0/xtensa-esp32-elf"
+    - "-isystem"
+    - "/Users/kevin/.platformio/packages/toolchain-xtensa-esp32/xtensa-esp32-elf/include"
+    - "-isystem"
+    - "/Users/kevin/.platformio/packages/toolchain-xtensa-esp32/lib/gcc/xtensa-esp32-elf/8.4.0/include"
+    - "-isystem"
+    - "/Users/kevin/.platformio/packages/toolchain-xtensa-esp32/lib/gcc/xtensa-esp32-elf/8.4.0/include-fixed"
+  
+  # Remove ESP32-specific flags that the system clangd doesn't support
+  Remove: [-mlongcalls, -fstrict-volatile-bitfields, -fno-tree-switch-conversion, -m*, -f*]
+
+Index:
+  Background: Build
