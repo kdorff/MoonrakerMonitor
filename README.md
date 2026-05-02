@@ -162,4 +162,11 @@ If you wish to modify the UI:
 
 ## License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)** License. 
+
+**What this means:**
+- ✅ **Personal Use**: You are free to build, use, and modify this for your own printers.
+- ✅ **Sharing**: You can share your modifications as long as you use the same license.
+- ❌ **Commercial Use**: You may **not** sell this software, or sell hardware (kits or pre-built) pre-loaded with this software, without explicit permission.
+
+See the [LICENSE](LICENSE) file for the full legal text.
