@@ -23,7 +23,7 @@ It features a premium, responsive React Single-Page Application (SPA) dashboard 
   <em>Moonraker Monitor running on an M5Stack Atom Lite with a custom 45-degree LED profile.</em>
 </p>
 
-> **3D Printed Case**: The LED bar shown above uses this **[LED Strip Profile 45 Degree](https://makerworld.com/en/models/198162-led-strip-profile-45-degree#profileId-218753)** model from MakerWorld.
+> **3D Printed Case**: The LED bar shown above uses the **[LED Strip Profile 45 Degree](https://makerworld.com/en/models/198162-led-strip-profile-45-degree#profileId-218753)** model. Special thanks to **[@UlleiJ](https://makerworld.com/en/@UlleiJ)** for the excellent design!
 
 ## Features
 
