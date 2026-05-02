@@ -159,3 +159,7 @@ If you wish to modify the UI:
 *   [ArduinoJson](https://arduinojson.org/) (Moonraker Parsing)
 *   [React](https://reactjs.org/), [Vite](https://vitejs.dev/), & [Tailwind CSS](https://tailwindcss.com/)
 *   [Lucide React](https://lucide.dev/) (Iconography)
+
+## License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
