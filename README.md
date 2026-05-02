@@ -50,7 +50,10 @@ Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/que
 
 ## Hardware Requirements
 
-1. **ESP32 Microcontroller** (e.g., ESP32 D1 Mini, NodeMCU-32S, or M5Stack ATOM Lite)
+1. **Dual-Core ESP32 Microcontroller** (Required for stable LED performance)
+   - **Recommended**: ESP32-D0WDQ6 (standard Dual Core), ESP32-S3.
+   - **Compatible Boards**: ESP32 D1 Mini, NodeMCU-32S, M5Stack ATOM Lite.
+   - **⚠️ Avoid Single-Core Models**: Models like the **ESP32-S2**, **ESP32-C3**, **ESP32-C6**, or **ESP32-Solo** will likely experience LED flickering because they cannot process network polling and LED animations simultaneously on separate cores.
 2. **LED Strip** (WS2812B, WS2811, or SK6812 RGBW)
 
 3. **5V Power Supply** (Dedicated power recommended for >30 LEDs)
