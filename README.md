@@ -13,6 +13,18 @@ It features a premium, responsive React Single-Page Application (SPA) dashboard 
   <em>Main Dashboard - Real-time progress and state visualization</em>
 </p>
 
+## Hardware in Action
+
+<p align="center">
+  <a href="docs/assets/led_action.jpg">
+    <img src="docs/assets/led_action.jpg" width="600" alt="Moonraker Monitor in Action">
+  </a>
+  <br>
+  <em>Moonraker Monitor running on an M5Stack Atom Lite with a custom 45-degree LED profile.</em>
+</p>
+
+> **3D Printed Case**: The LED bar shown above uses this **[LED Strip Profile 45 Degree](https://makerworld.com/en/models/198162-led-strip-profile-45-degree#profileId-218753)** model from MakerWorld.
+
 ## Features
 
 - **Intelligent Progress Math**: Uses a sophisticated "math engine" that prioritizes M73 (slicer-linear) metadata for extremely accurate progress tracking, with a robust fallback to file-byte progression for legacy compatibility.
