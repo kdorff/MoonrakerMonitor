@@ -6,10 +6,11 @@ A standalone smart appliance that directly polls a 3D printer's Moonraker API to
 
 ## Hardware Architecture
 * **Microcontroller:** ESP32 (Dual-core).
-* **LEDs:** WS2812B / WS2811 / SK6812 (RGB or RGBW). Support for multiple color orders (GRB, RGB, BRG, etc.) configurable via UI. Driven via GPIO (Default: 16).
-
-* **Power:** 5V Power Supply (Shared between ESP32 and LEDs, but with separate wiring to avoid drawing high current through the ESP32 pins). Common Ground is mandatory.
+* **LEDs:** WS2812B / WS2811 / SK6812 (RGB or RGBW). Support for multiple color orders (GRB, RGB, BRG, etc.) configurable via UI. 
 * **Architecture:** Uses **Core 0** for background network tasks (Moonraker polling) and **Core 1** for time-critical LED servicing and the Async Web Server. This ensures zero flickering during WiFi activity.
+
+### Hardware-Specific Notes
+- **M5Stack ATOM Lite**: Uses GPIO 26 for external LEDs. Internal LED is on GPIO 27 (not recommended for main strip due to heat).
 
 ## Software Architecture
 * **Backend:** C++ (PlatformIO / Arduino).
@@ -28,8 +29,9 @@ A standalone smart appliance that directly polls a 3D printer's Moonraker API to
 The system implements an 8-state awareness model:
 
 1. **Standby**: Idle state.
-2. **Preparation**: Heating, homing, or probing (State is `printing` but progress is `0.0`).
-3. **Printing**: Active print job.
+2. **Preparation**: Heating, homing, or probing.
+    - **Detection Logic**: If state is `printing` but `filament_used == 0` or `current_layer <= 0`, it is classified as "Preparation".
+3. **Printing**: Active print job with movement/extrusion.
 4. **Paused**: Print job suspended.
 5. **Complete**: Job finished successfully.
 6. **Cancelled**: Job aborted.
@@ -38,13 +40,34 @@ The system implements an 8-state awareness model:
 
 
 ### Progress & ETA Math
-* **Prioritized Tracking**: The system prioritizes `display_status.progress` (M73) because it provides a linear time-based progression.
+* **Prioritized Tracking**: The system prioritizes `display_status.progress` (M73) because it provides a linear time-based progression injected by the slicer.
 * **Fallback**: Falls back to `virtual_sdcard.progress` (file byte position) if M73 is not present in the G-code.
 * **ETA Extrapolation**: ETA is calculated on-board: `(Elapsed / Progress) - Elapsed`.
 * **Visual Safety**: Progress is capped at `99.9%` while in the `printing` state to ensure the strip doesn't show "Complete" before the physical move is finished.
 
 ## Core API Targets (Moonraker)
-The backend polls `/printer/objects/query` every 2 seconds for:
-* `print_stats`: state, print_duration.
-* `display_status`: progress (M73).
-* `virtual_sdcard`: progress (fallback).
+The backend polls `/printer/objects/query` every 2 seconds.
+
+### Polled Data Structure
+The following Moonraker objects are queried:
+- `print_stats`: Provides `state`, `print_duration`, `filament_used`, and `info` (layers).
+- `display_status`: Provides `progress` (M73).
+- `virtual_sdcard`: Provides `progress` (File-based fallback).
+
+### Example JSON Payload (Parsed)
+```json
+{
+  "result": {
+    "status": {
+      "print_stats": {
+        "state": "printing",
+        "print_duration": 1234.5,
+        "filament_used": 10.5,
+        "info": { "total_layer": 100, "current_layer": 10 }
+      },
+      "display_status": { "progress": 0.1 },
+      "virtual_sdcard": { "progress": 0.12 }
+    }
+  }
+}
+```

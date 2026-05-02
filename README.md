@@ -13,9 +13,11 @@ It features a premium, responsive React Single-Page Application (SPA) dashboard 
 - **Dynamic ETA Reporting**: Calculates and displays the estimated time remaining. The web dashboard also provides a localized "Finishes at" timestamp based on your browser's time.
 - **Dual-Core Processing**: Engineered for performance, the ESP32 uses Task Pinning to run Moonraker polling on **Core 0** and LED servicing/Web server on **Core 1**, ensuring zero LED flickering even during heavy network activity.
 - **8-State Awareness**: Dedicated LED mapping for `Standby`, `Preparation` (heating/homing), `Printing`, `Paused`, `Complete`, `Cancelled`, `Error`, and `Disconnected` (cannot reach Moonraker).
+- **Preparation State Intelligence**: Automatically detects preparation phases (heating/homing) by monitoring `filament_used` and layer counts, ensuring the "Printing" animation only starts when the nozzle actually begins moving.
 - **Configurable LED Type**: Support for various color orders (GRB, RGB, BRG) and 4-channel strips (RGBW/GRBW) directly from the web interface.
-
-- **Advanced Animation Engine**: Powered by `WS2812FX` with support for 50+ hardware-accelerated animations. Every state supports **bi-color mapping** (Primary/Secondary) for beautiful chase and pulse effects.
+- **Advanced Animation Engine**: Powered by `WS2812FX` with support for 50+ hardware-accelerated animations. 
+- **Custom WLED Effects**: Includes high-quality ports of popular WLED effects: **Rainbow**, **Colorloop**, **Lake**, and **Chunchun**.
+- **Every state supports bi-color mapping** (Primary/Secondary) for beautiful chase and pulse effects.
 - **Premium React Dashboard**: A sleek, modern UI built with React, TypeScript, and Tailwind CSS. Features shimmer-effect progress bars and real-time state synchronization.
 - **Dual OTA Support**: Update your device wirelessly via **ArduinoOTA** (from the IDE) or using the **Web Dashboard** (by uploading a `.bin` file).
 - **WiFiManager Integration**: No hardcoded credentials. Connect to the device's Access Point to easily configure your home Wi-Fi.
@@ -30,7 +32,7 @@ Moonraker Monitor uses the standard Klipper/Moonraker API (`/printer/objects/que
 
 ## Hardware Requirements
 
-1. **ESP32 Microcontroller** (e.g., ESP32 D1 Mini, NodeMCU-32S, or M5Stack ATOMS3)
+1. **ESP32 Microcontroller** (e.g., ESP32 D1 Mini, NodeMCU-32S, or M5Stack ATOM Lite)
 2. **LED Strip** (WS2812B, WS2811, or SK6812 RGBW)
 
 3. **5V Power Supply** (Dedicated power recommended for >30 LEDs)
@@ -43,11 +45,15 @@ While the ESP32 and LED strip can share the same 5V power supply, you should avo
 *   **For Testing**: A very short string (< 10 LEDs) can be powered directly from the ESP32's 5V pin for temporary testing.
 *   **For Production**: You should run separate power wires from your 5V supply directly to the LED strip. Drawing too much current through the ESP32 can overheat the board or damage its internal traces.
 
+**Common Microcontroller Pinouts:**
+- **ESP32 D1 Mini / DevKit**: GPIO 16 (Default)
+- **M5Stack ATOM Lite**: GPIO 26 (Internal LED is on Pin 27, but external strips use Pin 26)
+
 Please refer to the **[Adafruit NeoPixel Überguide: Basic Connections](https://learn.adafruit.com/adafruit-neopixel-uberguide/basic-connections)** for best practices.
 
 **Key Requirements:**
 1. **Common Ground**: Always ensure the Ground (GND) of your power supply, LED strip, and ESP32 are all connected together.
-2. **Data Resistor**: A 300-500 Ohm resistor on the data line (GPIO 16) is highly recommended to protect the first LED.
+2. **Data Resistor**: A 300-500 Ohm resistor on the data line is highly recommended to protect the first LED.
 3. **Power Injection**: For long strips, power should be injected at both ends to prevent voltage drop and color shifting.
 
 ## Software Installation (PlatformIO)
@@ -74,6 +80,22 @@ This project consists of a C++ firmware (`/backend`) and a React frontend (`/fro
    - Set your **LED Count** and **LED Pin**.
    - Map your preferred effects and colors for each state.
    - Click **Save Configuration**.
+
+## Troubleshooting
+
+### Web Dashboard Unreachable
+- Ensure your phone/PC is on the **same Wi-Fi network** as the ESP32.
+- Try navigating to `http://moonrakermonitor.local` (requires mDNS support on your device).
+- If the device is in AP mode (Hotspot visible), it hasn't connected to your Wi-Fi yet.
+
+### LEDs Not Lighting Up
+- Check your **LED Pin** configuration. (GPIO 16 for standard ESP32, GPIO 26 for M5Atom).
+- Ensure the **Common Ground** is connected between the ESP32 and the LED power supply.
+- Verify the **LED Type** (GRB vs RGB vs RGBW) matches your hardware.
+
+### Progress Not Moving
+- Ensure your Slicer is configured to emit **M73** markers (found in "Manage Printer" -> "G-code flavor" or "Post-processing scripts" in most slicers).
+- Moonraker Monitor will fall back to file-byte progression if M73 is missing, but M73 is highly recommended for accuracy.
 
 ## Over-The-Air (OTA) Updates
 
@@ -104,6 +126,7 @@ If you wish to modify the UI:
 
 *   [PlatformIO](https://platformio.org/) & [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
 *   [WS2812FX](https://github.com/kitesurfer1404/WS2812FX) (Animation Engine)
+*   [WLED](https://github.com/Aircoookie/WLED) (Effect logic inspiration)
 *   [ArduinoJson](https://arduinojson.org/) (Moonraker Parsing)
 *   [React](https://reactjs.org/), [Vite](https://vitejs.dev/), & [Tailwind CSS](https://tailwindcss.com/)
 *   [Lucide React](https://lucide.dev/) (Iconography)

@@ -97,6 +97,10 @@ bool ConfigManager::loadConfig() {
 
 /**
  * @brief Serializes the config struct to a JSON string and writes it to NVS.
+ * 
+ * We use a single JSON string in NVS rather than multiple keys (like "ip", "pin")
+ * because it's easier to maintain and allows for nested structures (like StateConfig)
+ * to be saved in a single atomic write operation.
  */
 bool ConfigManager::saveConfig() {
   JsonDocument doc;
@@ -117,7 +121,7 @@ bool ConfigManager::saveConfig() {
     json["speed"] = state.speed;
   };
 
-  // Convert each state struct into a nested JSON object
+  // Convert each state struct into a nested JSON object for the final payload
   saveState(doc["error"].to<JsonObject>(), _config.error);
   saveState(doc["complete"].to<JsonObject>(), _config.complete);
   saveState(doc["paused"].to<JsonObject>(), _config.paused);
@@ -133,7 +137,7 @@ bool ConfigManager::saveConfig() {
     return false;
   }
 
-  // Save the entire JSON string to a single NVS key
+  // Save the entire serialized JSON string to the "cfg" NVS key
   _preferences.putString("cfg", jsonStr);
   return true;
 }

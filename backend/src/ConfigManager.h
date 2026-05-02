@@ -29,22 +29,23 @@ struct StateConfig {
  * @brief Global application settings and state mappings.
  */
 struct AppConfig {
-    String moonrakerIP;     ///< IP address or hostname of the Moonraker server
-    String moonrakerApiKey; ///< Optional API key for restricted Moonraker instances
-    uint8_t ledPin;         ///< GPIO pin connected to the LED data line
-    uint16_t ledCount;      ///< Total number of LEDs in the strip
-    uint8_t ledBrightness;  ///< Global brightness (0-255)
-    uint16_t ledType;       ///< NeoPixel bitmask for protocol and color order (e.g., NEO_GRB)
+    String moonrakerIP;     ///< IP address or hostname of the Moonraker server.
+    String moonrakerApiKey; ///< Optional API key for Moonraker (X-Api-Key header).
+    uint8_t ledPin;         ///< GPIO pin connected to the LED data line.
+    uint16_t ledCount;      ///< Total number of LEDs in the strip/string.
+    uint8_t ledBrightness;  ///< Global brightness level (0-255).
+    uint16_t ledType;       ///< NeoPixel type bitmask (e.g., NEO_GRB + NEO_KHZ800).
     
-    // State-specific LED mappings
-    StateConfig error;        ///< Triggered on printer/network error
-    StateConfig complete;     ///< Triggered when a print job finishes successfully
-    StateConfig paused;       ///< Triggered when a print is suspended
-    StateConfig standby;      ///< Triggered when the printer is idle
-    StateConfig cancelled;    ///< Triggered when a print is aborted
-    StateConfig printing;     ///< Triggered during an active print job
-    StateConfig preparation;  ///< Triggered during heating, homing, or probing (Progress 0)
-    StateConfig disconnected; ///< Triggered when Moonraker is unreachable but WiFi is up
+    // State-specific LED mappings. These define which effect/colors to show
+    // when the printer transitions into a specific state.
+    StateConfig error;        ///< Triggered on printer/network error.
+    StateConfig complete;     ///< Triggered when a print job finishes successfully.
+    StateConfig paused;       ///< Triggered when a print is suspended.
+    StateConfig standby;      ///< Triggered when the printer is idle.
+    StateConfig cancelled;    ///< Triggered when a print is aborted.
+    StateConfig printing;     ///< Triggered during an active print job.
+    StateConfig preparation;  ///< Triggered during heating, homing, or probing.
+    StateConfig disconnected; ///< Triggered when Moonraker is unreachable but WiFi is connected.
 };
 
 /**

@@ -4,6 +4,9 @@
  * 
  * Provides real-time printer status visualization and a comprehensive 
  * configuration interface for managing LED effects and device settings.
+ * 
+ * Uses React hooks for state management and Lucide for iconography.
+ * The UI is styled with Tailwind CSS for a premium, responsive feel.
  */
 
 import { useEffect, useState } from 'react';
@@ -20,7 +23,7 @@ interface Config {
   ledPin: number;
   ledCount: number;
   ledBrightness: number;
-  // State-specific LED configurations
+  // State-specific LED configurations. Each state maps to an effect, speed, and 2 colors.
   error: { effect: number; color: number; color2: number; speed: number };
   complete: { effect: number; color: number; color2: number; speed: number };
   paused: { effect: number; color: number; color2: number; speed: number };
@@ -29,7 +32,7 @@ interface Config {
   printing: { effect: number; color: number; color2: number; speed: number };
   preparation: { effect: number; color: number; color2: number; speed: number };
   disconnected: { effect: number; color: number; color2: number; speed: number };
-  ledType: number; // Bitmask for Adafruit_NeoPixel type
+  ledType: number; // Bitmask for Adafruit_NeoPixel type (e.g. GRB, RGBW)
 }
 
 /**
@@ -37,13 +40,14 @@ interface Config {
  * @brief Represents the current printer status returned by the backend API.
  */
 interface Status {
-  state: string;       ///< Current state string (printing, standby, etc.)
+  state: string;       ///< Current state string (printing, standby, complete, etc.)
   progress: number;    ///< Percent progress (0-100)
-  etaSeconds: number;  ///< Estimated time remaining
-  connected: boolean;  ///< Connection status to Moonraker
+  etaSeconds: number;  ///< Estimated time remaining in seconds
+  connected: boolean;  ///< Whether the ESP32 is successfully talking to Moonraker
 }
 
-// Supported WS2812FX effects
+// Supported WS2812FX effects. IDs match the C++ enum values.
+// IDs 72-75 are custom ported WLED effects.
 const EFFECTS = [
   { id: 0, name: "Static" },
   { id: 53, name: "Bicolor Chase" },
@@ -51,9 +55,11 @@ const EFFECTS = [
   { id: 2, name: "Breath" },
   { id: 31, name: "Chase Color" },
   { id: 33, name: "Chase Rainbow" },
+  { id: 75, name: "Chunchun (WLED)" },
   { id: 3, name: "Color Wipe" },
   { id: 7, name: "Color Wipe Random" },
   { id: 37, name: "Colorful" },
+  { id: 72, name: "Colorloop (WLED)" },
   { id: 44, name: "Comet" },
   { id: 14, name: "Dual Scan" },
   { id: 15, name: "Fade" },
@@ -62,9 +68,11 @@ const EFFECTS = [
   { id: 49, name: "Fire Flicker (Soft)" },
   { id: 45, name: "Fireworks" },
   { id: 52, name: "Halloween" },
+  { id: 74, name: "Lake (WLED)" },
   { id: 43, name: "Larson Scanner" },
   { id: 10, name: "Multi Dynamic" },
   { id: 11, name: "Rainbow" },
+  { id: 73, name: "Rainbow (WLED)" },
   { id: 12, name: "Rainbow Cycle" },
   { id: 8, name: "Random Color" },
   { id: 18, name: "Running Lights" },
@@ -80,7 +88,8 @@ const EFFECTS = [
   { id: 20, name: "Twinkle Random" },
 ];
 
-// Mapping of Adafruit_NeoPixel constants to human-readable names
+// Mapping of Adafruit_NeoPixel constants to human-readable names.
+// These bitmasks tell the hardware how to interpret the data stream.
 const LED_TYPES = [
   { val: 82, name: "WS2812B / WS2811 (GRB)" },
   { val: 6, name: "WS2811 / Some WS2812 (RGB)" },
@@ -89,7 +98,8 @@ const LED_TYPES = [
   { val: 198, name: "SK6812 (RGBW)" },
 ];
 
-// Curated color palette
+// Curated color palette for easy selection. 
+// Values are 32-bit hex (0xRRGGBB).
 const COLORS = [
   { val: 0x0000FF, name: "Blue" },
   { val: 0x00FFFF, name: "Cyan" },
@@ -109,13 +119,15 @@ const COLORS = [
 ];
 
 export default function App() {
+  // Application State
   const [status, setStatus] = useState<Status>({ state: 'standby', progress: 0, etaSeconds: 0, connected: false });
   const [config, setConfig] = useState<Config | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'config'>('dashboard');
   const [saving, setSaving] = useState(false);
 
   /**
-   * Initialize and start polling
+   * @brief Initialize application.
+   * Fetches the config once and starts a 1-second polling interval for status.
    */
   useEffect(() => {
     fetchConfig();
@@ -124,7 +136,8 @@ export default function App() {
   }, []);
 
   /**
-   * Retrieve current printer status from the ESP32 API
+   * @brief Retrieve current printer status from the ESP32 API.
+   * Target: GET /api/status
    */
   const fetchStatus = async () => {
     try {
@@ -136,7 +149,8 @@ export default function App() {
   };
 
   /**
-   * Retrieve device configuration from the ESP32 API
+   * @brief Retrieve device configuration from the ESP32 API.
+   * Target: GET /api/config
    */
   const fetchConfig = async () => {
     try {
@@ -148,7 +162,8 @@ export default function App() {
   };
 
   /**
-   * Submit updated configuration to the ESP32
+   * @brief Submit updated configuration to the ESP32.
+   * Target: POST /api/config
    */
   const handleSaveConfig = async () => {
     if (!config) return;
@@ -167,19 +182,23 @@ export default function App() {
   };
 
   /**
-   * Request a system restart
+   * @brief Request a system restart of the ESP32.
+   * Target: POST /api/restart
    */
   const handleRestart = async () => {
     if (confirm("Restart ESP32?")) {
       try {
         await fetch('/api/restart', { method: 'POST' });
         alert('Restarting...');
-      } catch (e) {}
+      } catch (e) { }
     }
   };
 
   /**
-   * Formats seconds into a human-readable duration (e.g., "1h 23m")
+   * @brief Formats seconds into a human-readable duration (e.g., "1h 23m").
+   * 
+   * @param seconds Total seconds to format.
+   * @return string Formatted duration.
    */
   const formatETA = (seconds: number) => {
     if (seconds <= 0) return "Done";
@@ -189,7 +208,11 @@ export default function App() {
   };
 
   /**
-   * Calculates local completion time based on remaining seconds
+   * @brief Calculates local completion time based on remaining seconds.
+   * Uses the client's system clock for localization.
+   * 
+   * @param seconds Seconds remaining until completion.
+   * @return string Formatted absolute time (e.g. "Sat, 4:30 PM").
    */
   const formatCompletionTime = (seconds: number) => {
     if (seconds <= 0) return "";
@@ -198,11 +221,12 @@ export default function App() {
   };
 
   /**
-   * RENDER: Dashboard Tab
+   * @brief Renders the Dashboard tab.
+   * Includes state card, progress bar with shimmer effect, and ETA reporting.
    */
   const renderDashboard = () => (
     <div className="space-y-6">
-      {/* State Card */}
+      {/* State Card - Shows active printer state and connection heartbeat */}
       <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 flex items-center justify-between">
         <div>
           <h2 className="text-sm text-slate-400 font-semibold uppercase tracking-wider">Printer State</h2>
@@ -217,15 +241,15 @@ export default function App() {
         {status.state === 'disconnected' && <Power className="text-slate-500 w-12 h-12" />}
       </div>
 
-      {/* Progress Card */}
+      {/* Progress Card - Interactive progress bar and linear tracking */}
       <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
         <div className="flex justify-between items-end mb-4">
           <h2 className="text-xl font-semibold">Progress</h2>
           <span className="text-3xl font-bold text-blue-400">{status.progress.toFixed(1)}%</span>
         </div>
-        {/* Shimmer Effect Progress Bar */}
+        {/* Shimmer Effect Progress Bar: Uses a CSS animation on a skew-x-12 overlay to simulate movement */}
         <div className="w-full bg-slate-900 rounded-full h-6 overflow-hidden border border-slate-700 relative">
-          <div 
+          <div
             className="bg-gradient-to-r from-blue-600 to-cyan-400 h-6 transition-all duration-500 ease-out relative"
             style={{ width: `${status.progress}%` }}
           >
@@ -233,7 +257,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* ETA Section */}
+        {/* ETA Section - On-board calculated time remaining and localized finish time */}
         <div className="mt-6 flex items-center justify-between text-slate-300">
           <div className="flex items-center gap-3">
             <Clock className="w-5 h-5 text-slate-400" />
@@ -250,13 +274,14 @@ export default function App() {
   );
 
   /**
-   * RENDER: Config Tab
+   * @brief Renders the Config tab.
+   * Includes hardware settings, network settings, and LED state mappings.
    */
   const renderConfig = () => {
     if (!config) return <div className="text-center p-10 animate-pulse">Loading Config...</div>;
 
     /**
-     * Updates a nested state configuration property
+     * @brief Updates a nested state configuration property (effect, color, speed).
      */
     const updateStateFX = (stateName: keyof Config, field: string, val: number) => {
       setConfig(prev => {
@@ -270,39 +295,39 @@ export default function App() {
       <div className="space-y-6">
         {/* Hardware & Network Settings */}
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Settings className="w-5 h-5"/> Device Settings</h2>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Settings className="w-5 h-5" /> Device Settings</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">Moonraker IP</label>
-              <input type="text" value={config.moonrakerIP} onChange={e => setConfig({...config, moonrakerIP: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
+              <input type="text" value={config.moonrakerIP} onChange={e => setConfig({ ...config, moonrakerIP: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">Moonraker API Key (Optional)</label>
-              <input type="password" placeholder="Leave blank if disabled" value={config.moonrakerApiKey || ''} onChange={e => setConfig({...config, moonrakerApiKey: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
+              <input type="password" placeholder="Leave blank if disabled" value={config.moonrakerApiKey || ''} onChange={e => setConfig({ ...config, moonrakerApiKey: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">LED Pin</label>
-              <input type="number" value={config.ledPin} onChange={e => setConfig({...config, ledPin: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
+              <input type="number" value={config.ledPin} onChange={e => setConfig({ ...config, ledPin: parseInt(e.target.value) })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">LED Count</label>
-              <input type="number" value={config.ledCount} onChange={e => setConfig({...config, ledCount: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
+              <input type="number" value={config.ledCount} onChange={e => setConfig({ ...config, ledCount: parseInt(e.target.value) })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">LED Brightness</label>
-              <input type="range" min="1" max="255" value={config.ledBrightness} onChange={e => setConfig({...config, ledBrightness: parseInt(e.target.value)})} className="w-full accent-blue-500 mt-2" />
+              <input type="range" min="1" max="255" value={config.ledBrightness} onChange={e => setConfig({ ...config, ledBrightness: parseInt(e.target.value) })} className="w-full accent-blue-500 mt-2" />
               <div className="text-right text-xs text-slate-500">{config.ledBrightness}/255</div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">LED Strip Type</label>
-              <select value={config.ledType} onChange={e => setConfig({...config, ledType: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors">
+              <select value={config.ledType} onChange={e => setConfig({ ...config, ledType: parseInt(e.target.value) })} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500 transition-colors">
                 {LED_TYPES.map(type => <option key={type.val} value={type.val}>{type.name}</option>)}
               </select>
             </div>
           </div>
         </div>
 
-        {/* Animation Mapping Settings */}
+        {/* Animation Mapping Settings - Defines how the LEDs react to printer state changes */}
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
           <h2 className="text-xl font-bold mb-4">State Effects Mapping</h2>
           <div className="space-y-4">
@@ -329,7 +354,7 @@ export default function App() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] text-slate-400 uppercase tracking-wider">Speed</span>
-                  {/* Speed is inverted in UI: Slider RIGHT = Lower ms = FASTER animation */}
+                  {/* Speed is inverted in UI for UX: Slider RIGHT = Lower ms = FASTER animation */}
                   <input type="range" min="100" max="5000" value={5100 - config[state].speed} onChange={e => updateStateFX(state, 'speed', 5100 - parseInt(e.target.value))} className="w-full accent-blue-500" />
                 </div>
               </div>
@@ -351,21 +376,22 @@ export default function App() {
   };
 
   /**
-   * MAIN RENDER
+   * @brief Main Render Wrapper.
+   * Handles tab navigation and layout.
    */
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Moonraker Monitor</h1>
         <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
-          <button 
-            onClick={() => setActiveTab('dashboard')} 
+          <button
+            onClick={() => setActiveTab('dashboard')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
           >
             Dashboard
           </button>
-          <button 
-            onClick={() => setActiveTab('config')} 
+          <button
+            onClick={() => setActiveTab('config')}
             className={`px-4 py-2 rounded-md font-medium transition-colors ${activeTab === 'config' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
           >
             Config
