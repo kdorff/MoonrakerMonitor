@@ -5,7 +5,13 @@ Moonraker Monitor is a standalone ESP32-based hardware status indicator for Klip
 
 It features a premium, responsive React Single-Page Application (SPA) dashboard hosted directly on the ESP32, allowing you to configure the LED animations and colors from any web browser without needing to recompile the firmware.
 
-![Dashboard Preview](https://via.placeholder.com/800x400.png?text=Moonraker+Monitor+Dashboard) *(Dashboard preview)*
+<p align="center">
+  <a href="docs/assets/dashboard.png">
+    <img src="docs/assets/dashboard.png" width="600" alt="Moonraker Monitor Dashboard">
+  </a>
+  <br>
+  <em>Main Dashboard - Real-time progress and state visualization</em>
+</p>
 
 ## Features
 
@@ -80,6 +86,14 @@ This project consists of a C++ firmware (`/backend`) and a React frontend (`/fro
    - Set your **LED Count** and **LED Pin**.
    - Map your preferred effects and colors for each state.
    - Click **Save Configuration**.
+
+<p align="center">
+  <a href="docs/assets/config.png">
+    <img src="docs/assets/config.png" width="600" alt="Moonraker Monitor Configuration">
+  </a>
+  <br>
+  <em>Configuration Tab - Hardware settings and LED animation mapping</em>
+</p>
 
 ## Troubleshooting
 
